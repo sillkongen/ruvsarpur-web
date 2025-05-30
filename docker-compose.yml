@@ -2,25 +2,29 @@ version: '3.8'
 
 services:
   ruvsarpur-web:
-    build: .
+    build: 
+      context: .
+      args:
+        - USER_ID=${USER_ID:-1000}
+        - GROUP_ID=${GROUP_ID:-1000}
     ports:
       - "5000:5000"    # Flask frontend
       - "8001:8001"    # FastAPI backend
     volumes:
-      # EPG/Schedule data - multiple options for flexibility
-      - ./data:/app/data
-      - ${HOME}/.ruvsarpur:/root/.ruvsarpur
-      - ./data/.ruvsarpur:/app/.ruvsarpur
+      # EPG/Schedule data - persist in host user's home directory, mounted to appuser in container
+      - ${HOME}/.ruvsarpur:/home/appuser/.ruvsarpur
       # Downloads directory  
       - ./downloads:/app/downloads
-      # Mount ruvsarpur source 
-      - ../ruv-container/ruvsarpur/src:/app/ruvsarpur
+      # Local data directory as fallback
+      - ./data:/app/data
+      # ruvsarpur is now included in the repository - no external mount needed
     environment:
       - PYTHONPATH=/app:/app/ruvsarpur
       - RUVSARPUR_PATH=/app/ruvsarpur
       - FLASK_ENV=production
-      # Add fallback EPG path
-      - SCHEDULE_FILE_FALLBACK=/app/.ruvsarpur/tvschedule.json
+      # EPG data locations in order of preference
+      - SCHEDULE_FILE=/home/appuser/.ruvsarpur/tvschedule.json
+      - SCHEDULE_FILE_FALLBACK=/app/data/.ruvsarpur/tvschedule.json
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000"]

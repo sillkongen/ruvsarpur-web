@@ -11,7 +11,7 @@ services:
       - ./downloads:/app/downloads
       - ./data:/app/data
       - ./data/.ruvsarpur:/app/.ruvsarpur
-      - ../ruv-container/ruvsarpur/src:/app/ruvsarpur
+      # ruvsarpur is now included in the repository
     environment:
       - PYTHONPATH=/app:/app/ruvsarpur
       - RUVSARPUR_PATH=/app/ruvsarpur

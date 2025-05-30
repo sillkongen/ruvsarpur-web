@@ -1,0 +1,92 @@
+# Video files - should not be in the image
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.wmv
+*.flv
+*.webm
+*.m4v
+
+# Audio files
+*.mp3
+*.wav
+*.flac
+*.aac
+*.ogg
+
+# Subtitle files
+*.srt
+*.vtt
+*.sub
+*.idx
+
+# Downloads directory - mounted as volume
+downloads/
+downloads/*
+
+# Data directory content - mounted as volume  
+data/*
+!data/.gitkeep
+
+# EPG/Schedule data (copyrighted)
+**/tvschedule.json
+**/tvschedule*.json
+**/.ruvsarpur/
+
+# Development files
+.git/
+.gitignore
+*.md
+!README.md
+!ruvsarpur/README.md
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+logs/
+
+# Database files (should be in mounted volume)
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Docker files (not needed in container)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD files
+.github/
+
+# Documentation
+CONTRIBUTING.md
+LICENSE 

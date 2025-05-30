@@ -19,8 +19,8 @@ RUVSARPUR_PATH = os.environ.get('RUVSARPUR_PATH', os.path.join(os.path.dirname(o
 RUVSARPUR_SCRIPT = os.path.join(RUVSARPUR_PATH, "ruvsarpur.py")
 
 # Path to the schedule JSON file
-SCHEDULE_FILE = os.environ.get('SCHEDULE_FILE', os.path.expanduser("~/.ruvsarpur/tvschedule.json"))
-SCHEDULE_FILE_FALLBACK = os.environ.get('SCHEDULE_FILE_FALLBACK', "/app/.ruvsarpur/tvschedule.json")
+SCHEDULE_FILE = os.environ.get('SCHEDULE_FILE', "/home/appuser/.ruvsarpur/tvschedule.json")
+SCHEDULE_FILE_FALLBACK = os.environ.get('SCHEDULE_FILE_FALLBACK', "/app/data/.ruvsarpur/tvschedule.json")
 
 # Verify the script exists
 if not os.path.exists(RUVSARPUR_SCRIPT):
@@ -35,10 +35,10 @@ def load_schedule():
     
     # Try multiple locations for the schedule file
     possible_locations = [
-        SCHEDULE_FILE,
-        SCHEDULE_FILE_FALLBACK,
-        "/root/.ruvsarpur/tvschedule.json",
-        "/app/.ruvsarpur/tvschedule.json"
+        SCHEDULE_FILE,                                          # /home/appuser/.ruvsarpur/tvschedule.json
+        SCHEDULE_FILE_FALLBACK,                                # /app/data/.ruvsarpur/tvschedule.json
+        "/root/.ruvsarpur/tvschedule.json",                    # Fallback location
+        "/app/.ruvsarpur/tvschedule.json"                     # Legacy location
     ]
     
     schedule_file = None
@@ -196,7 +196,25 @@ async def download_show_task(pid: str, quality: str, output_dir: str):
     """Background task to handle show download using ruvsarpur script"""
     try:
         logger.info(f"Starting download for PID: {pid}")
-        download_status[pid] = {"status": "downloading", "file_path": None}
+        
+        # Check if EPG data is available before starting
+        epg_locations = [
+            "/home/appuser/.ruvsarpur/tvschedule.json",         # Primary location (appuser)
+            "/app/data/.ruvsarpur/tvschedule.json",             # Fallback location  
+            "/root/.ruvsarpur/tvschedule.json",                 # Secondary location
+            "/app/.ruvsarpur/tvschedule.json"                   # Legacy location
+        ]
+        
+        epg_found = any(os.path.exists(location) for location in epg_locations)
+        
+        if epg_found:
+            download_status[pid] = {"status": "downloading", "file_path": None}
+        else:
+            download_status[pid] = {
+                "status": "downloading", 
+                "file_path": None,
+                "message": "Downloading EPG data first (may take 5-8 minutes)..."
+            }
         
         # Ensure we have the absolute path
         abs_output_dir = os.path.abspath(output_dir)
@@ -210,6 +228,12 @@ async def download_show_task(pid: str, quality: str, output_dir: str):
         if not os.path.exists(python_executable):
             python_executable = sys.executable
         
+        logger.info(f"Using Python executable: {python_executable}")
+        logger.info(f"RUVSARPUR_SCRIPT path: {RUVSARPUR_SCRIPT}")
+        logger.info(f"Script exists: {os.path.exists(RUVSARPUR_SCRIPT)}")
+        logger.info(f"Script permissions: {oct(os.stat(RUVSARPUR_SCRIPT).st_mode)[-3:] if os.path.exists(RUVSARPUR_SCRIPT) else 'N/A'}")
+        logger.info(f"EPG data found: {epg_found}")
+        
         # Use the ruvsarpur script to download with absolute path
         cmd = [python_executable, RUVSARPUR_SCRIPT, "--pid", pid, "--output", abs_output_dir]
         
@@ -219,14 +243,37 @@ async def download_show_task(pid: str, quality: str, output_dir: str):
         
         logger.info(f"Running download command: {' '.join(cmd)}")
         
+        # Set environment variables for ruvsarpur execution
+        env = os.environ.copy()
+        env['HOME'] = '/home/appuser'  # Ensure ruvsarpur looks for EPG data in the correct appuser location
+        
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=RUVSARPUR_PATH
+            cwd=RUVSARPUR_PATH,
+            env=env
         )
         
-        stdout, stderr = await process.communicate()
+        # Add timeout to prevent hanging indefinitely (30 minutes max)
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), 
+                timeout=1800  # 30 minutes timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Download timed out for PID {pid} after 30 minutes")
+            process.kill()
+            await process.wait()
+            download_status[pid] = {
+                "status": "failed",
+                "error": "Download timed out after 30 minutes"
+            }
+            return
+        
+        logger.info(f"Download process completed with return code: {process.returncode}")
+        logger.info(f"STDOUT: {stdout.decode('utf-8') if stdout else 'No stdout'}")
+        logger.info(f"STDERR: {stderr.decode('utf-8') if stderr else 'No stderr'}")
         
         if process.returncode == 0:
             logger.info(f"Download completed successfully for PID: {pid}")
@@ -236,7 +283,7 @@ async def download_show_task(pid: str, quality: str, output_dir: str):
                 "message": "Download completed successfully"
             }
         else:
-            error_msg = stderr.decode('utf-8') if stderr else "Unknown error"
+            error_msg = stderr.decode('utf-8') if stderr else f"Process failed with return code {process.returncode}"
             logger.error(f"Download failed for PID {pid}: {error_msg}")
             download_status[pid] = {
                 "status": "failed",
@@ -244,7 +291,7 @@ async def download_show_task(pid: str, quality: str, output_dir: str):
             }
             
     except Exception as e:
-        logger.error(f"Download error for {pid}: {str(e)}")
+        logger.error(f"Download error for {pid}: {str(e)}", exc_info=True)
         download_status[pid] = {"status": "failed", "error": str(e)}
 
 @app.post("/api/download")
@@ -289,4 +336,150 @@ async def get_status(pid: str):
         raise HTTPException(status_code=404, detail="Download not found")
     
     logger.debug(f"PID '{stripped_pid}' found. Status: {download_status[stripped_pid]}")
-    return download_status[stripped_pid] 
+    return download_status[stripped_pid]
+
+@app.get("/api/epg-status")
+async def get_epg_status():
+    """Check EPG data availability"""
+    try:
+        # Check multiple locations for EPG data
+        epg_locations = [
+            "/home/appuser/.ruvsarpur/tvschedule.json",         # Primary location (appuser)
+            "/app/data/.ruvsarpur/tvschedule.json",             # Fallback location
+            "/root/.ruvsarpur/tvschedule.json",                 # Secondary location
+            "/app/.ruvsarpur/tvschedule.json"                   # Legacy location
+        ]
+        
+        epg_found = False
+        epg_location = None
+        epg_size = 0
+        epg_modified = None
+        
+        for location in epg_locations:
+            if os.path.exists(location):
+                epg_found = True
+                epg_location = location
+                stat = os.stat(location)
+                epg_size = stat.st_size
+                epg_modified = stat.st_mtime
+                break
+        
+        return {
+            "epg_available": epg_found,
+            "epg_location": epg_location,
+            "epg_size_mb": round(epg_size / (1024 * 1024), 2) if epg_size > 0 else 0,
+            "epg_last_modified": epg_modified,
+            "schedule_items": len(schedule_data) if schedule_data else 0
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking EPG status: {str(e)}")
+        return {
+            "epg_available": False,
+            "error": str(e)
+        }
+
+@app.post("/api/download-epg")
+async def download_epg():
+    """Manually trigger EPG download"""
+    try:
+        python_executable = os.path.join(os.path.dirname(sys.executable), "python3")
+        if not os.path.exists(python_executable):
+            python_executable = sys.executable
+        
+        # Create EPG directory in appuser's home (mounted from host)
+        os.makedirs("/home/appuser/.ruvsarpur", exist_ok=True)
+        
+        # Run ruvsarpur with a simple command to trigger EPG download
+        cmd = [python_executable, RUVSARPUR_SCRIPT, "--find", "test", "--limit", "1"]
+        
+        logger.info(f"Triggering EPG download with command: {' '.join(cmd)}")
+        
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=RUVSARPUR_PATH
+        )
+        
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), 
+                timeout=600  # 10 minutes timeout for EPG download
+            )
+        except asyncio.TimeoutError:
+            return {
+                "status": "error",
+                "message": "EPG download timed out after 10 minutes"
+            }
+        
+        # Reload schedule data after EPG download
+        load_schedule()
+        
+        return {
+            "status": "success" if process.returncode == 0 else "error",
+            "return_code": process.returncode,
+            "stdout": stdout.decode('utf-8') if stdout else "",
+            "stderr": stderr.decode('utf-8') if stderr else "",
+            "schedule_items": len(schedule_data)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error downloading EPG: {str(e)}", exc_info=True)
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+@app.get("/api/test-ruvsarpur")
+async def test_ruvsarpur():
+    """Test if ruvsarpur script is working"""
+    try:
+        # Use the correct Python interpreter from the current virtual environment
+        python_executable = os.path.join(os.path.dirname(sys.executable), "python3")
+        if not os.path.exists(python_executable):
+            python_executable = sys.executable
+        
+        # Test with --help command (should be quick)
+        cmd = [python_executable, RUVSARPUR_SCRIPT, "--help"]
+        
+        logger.info(f"Testing ruvsarpur with command: {' '.join(cmd)}")
+        
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=RUVSARPUR_PATH
+        )
+        
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), 
+                timeout=30  # 30 seconds timeout for help
+            )
+        except asyncio.TimeoutError:
+            return {
+                "status": "error",
+                "message": "Ruvsarpur script timed out even for --help command"
+            }
+        
+        logger.info(f"Test completed with return code: {process.returncode}")
+        logger.info(f"STDOUT: {stdout.decode('utf-8') if stdout else 'No stdout'}")
+        logger.info(f"STDERR: {stderr.decode('utf-8') if stderr else 'No stderr'}")
+        
+        return {
+            "status": "success" if process.returncode == 0 else "error",
+            "return_code": process.returncode,
+            "stdout": stdout.decode('utf-8') if stdout else "",
+            "stderr": stderr.decode('utf-8') if stderr else "",
+            "script_path": RUVSARPUR_SCRIPT,
+            "script_exists": os.path.exists(RUVSARPUR_SCRIPT),
+            "python_executable": python_executable
+        }
+        
+    except Exception as e:
+        logger.error(f"Error testing ruvsarpur: {str(e)}", exc_info=True)
+        return {
+            "status": "error",
+            "message": str(e)
+        } 

@@ -158,6 +158,19 @@
     <div class="container py-4">
         <h1 class="mb-4">RÚV Sarpurinn Downloader</h1>
         
+        <!-- EPG Status Section -->
+        <div id="epgStatus" class="alert alert-success mb-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1">📺 EPG Data Status</h6>
+                    <small id="epgStatusText">✅ EPG data available - Search and downloads working normally</small>
+                </div>
+                <button id="downloadEpgBtn" class="btn btn-primary btn-sm d-none">
+                    Download EPG Data
+                </button>
+            </div>
+        </div>
+        
         <!-- Search Form -->
         <form id="searchForm" class="mb-4">
             <div class="input-group">

@@ -1,0 +1,8 @@
+colorama
+termcolor
+python-dateutil
+requests
+simplejson
+fuzzywuzzy
+python-levenshtein
+ffmpeg-python

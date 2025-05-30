@@ -28,10 +28,10 @@ A modern web interface for downloading shows from RÚV Sarpurinn with instant se
 
 ### Prerequisites
 
-This web interface requires the `ruvsarpur` source code to be available. Make sure you have:
+This web interface includes ruvsarpur source code, so you only need:
 
-1. **ruvsarpur source**: Clone from [https://github.com/sverrirs/ruvsarpur](https://github.com/sverrirs/ruvsarpur)
-2. **EPG data**: Run ruvsarpur at least once to generate `~/.ruvsarpur/tvschedule.json`
+1. **EPG data**: Run ruvsarpur at least once to generate `~/.ruvsarpur/tvschedule.json`  
+   (Or use any existing ruvsarpur installation)
 
 ### Docker Deployment (Recommended)
 
@@ -39,29 +39,31 @@ This web interface requires the `ruvsarpur` source code to be available. Make su
    ```bash
    git clone https://github.com/sillkongen/ruvsarpur-web.git
    cd ruvsarpur-web
+   ```
+
+2. **Quick Start (handles permissions automatically):**
+   ```bash
+   ./start.sh
+   ```
+   This script will:
+   - Set correct user/group IDs to avoid permission issues
+   - Create necessary directories
+   - Setup EPG data if available
+   - Start the containers
+
+3. **Manual setup (alternative):**
+   ```bash
    mkdir -p downloads data
-   ```
-
-2. **Setup EPG data:**
-   ```bash
-   ./setup-epg.sh
-   ```
-   This copies your EPG data locally to avoid volume mount issues.
-
-3. **Verify ruvsarpur source location:**
-   ```bash
-   ls ../ruv-container/ruvsarpur/src/ruvsarpur.py
-   ```
-   If this file doesn't exist, adjust the volume mount in `docker-compose.yml`
-
-4. **Build and run:**
-   ```bash
+   ./setup-epg.sh  # If you have EPG data
+   export USER_ID=$(id -u) GROUP_ID=$(id -g)
    docker-compose up --build
    ```
 
-5. **Access the application:**
+4. **Access the application:**
    - Web interface: http://localhost:5000
    - API backend: http://localhost:8001
+
+**Note**: Downloaded files will now have proper ownership matching your user! 🎉
 
 ### Manual Development
 
@@ -87,10 +89,15 @@ If you prefer to run without Docker:
 
 ```
 ruvsarpur-web/
+├── start.sh               # Easy startup script (handles permissions)
 ├── app.py                  # Flask frontend application
 ├── backend/                # FastAPI backend
 │   └── app/
 │       └── main.py        # API endpoints and download logic
+├── ruvsarpur/             # Included ruvsarpur source code
+│   ├── ruvsarpur.py       # Main download script by @sverrirs
+│   ├── utilities.py       # Utility functions
+│   └── LICENSE-ruvsarpur  # Original MIT license
 ├── templates/             # HTML templates
 ├── static/               # CSS, JS, and assets
 ├── database.py           # SQLite database operations
@@ -98,10 +105,20 @@ ruvsarpur-web/
 ├── data/                # Application data and EPG cache
 ├── docker-compose.yml   # Docker deployment configuration
 ├── Dockerfile           # Container build instructions
+├── .dockerignore        # Excludes large files from Docker build
 └── setup-epg.sh        # EPG data setup script
 ```
 
-## 🔧 Configuration
+## 📄 Configuration
+
+### Docker Build Optimization
+
+The `.dockerignore` file excludes unnecessary content from the Docker build:
+- 🎬 Video files (*.mp4, *.mkv, etc.) - prevents large files in image
+- 📁 Downloads/data directories - these are mounted as volumes
+- 🛠️ Development files - keeps image lean
+
+This ensures fast builds and small image sizes while maintaining full functionality.
 
 ### EPG Data Handling
 
@@ -147,7 +164,8 @@ ls -la downloads/*.mp4
 - `./downloads` → `/app/downloads` (Downloaded video files - **accessible outside container**)
 - `./data` → `/app/data` (Application data)
 - `~/.ruvsarpur` → `/root/.ruvsarpur` (EPG/Schedule cache)
-- `../ruv-container/ruvsarpur/src` → `/app/ruvsarpur` (ruvsarpur source code)
+
+**Note**: ruvsarpur source code is now included in the repository - no external mounting required!
 
 ### Environment Variables
 

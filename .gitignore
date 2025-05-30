@@ -70,9 +70,6 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# Docker
-.dockerignore
-
 # Application specific
 data/
 downloads/

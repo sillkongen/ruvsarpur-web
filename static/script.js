@@ -5,12 +5,91 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingDiv = document.getElementById('loading');
     const themeToggle = document.getElementById('themeToggle');
     const themeIcon = document.getElementById('themeIcon');
+    const epgStatusDiv = document.getElementById('epgStatus');
+    const epgStatusText = document.getElementById('epgStatusText');
+    const downloadEpgBtn = document.getElementById('downloadEpgBtn');
     let debounceTimer;
     
     // Make activeDownloads globally accessible
     if (!window.activeDownloads) {
         window.activeDownloads = new Set();
     }
+
+    // EPG Status functionality
+    async function checkEpgStatus() {
+        try {
+            const response = await fetch('/api/epg-status');
+            const data = await response.json();
+            
+            if (data.epg_available) {
+                epgStatusDiv.className = 'alert alert-success mb-4';
+                epgStatusText.innerHTML = `
+                    ✅ EPG data available (${data.epg_size_mb} MB, ${data.schedule_items} shows)
+                    <br><small class="text-muted">Location: ${data.epg_location}</small>
+                `;
+                downloadEpgBtn.classList.add('d-none');
+            } else {
+                epgStatusDiv.className = 'alert alert-warning mb-4';
+                epgStatusText.innerHTML = `
+                    ⚠️ EPG data not found. Downloads may take 5-8 minutes for initial EPG download.
+                    <br><small class="text-muted">Click the button to download EPG data manually.</small>
+                `;
+                downloadEpgBtn.classList.remove('d-none');
+            }
+        } catch (error) {
+            console.error('Error checking EPG status:', error);
+            epgStatusDiv.className = 'alert alert-danger mb-4';
+            epgStatusText.textContent = 'Error checking EPG status';
+            downloadEpgBtn.classList.add('d-none');
+        }
+    }
+
+    async function downloadEpg() {
+        downloadEpgBtn.disabled = true;
+        downloadEpgBtn.textContent = 'Downloading EPG...';
+        epgStatusDiv.className = 'alert alert-info mb-4';
+        epgStatusText.innerHTML = `
+            ⏳ Downloading EPG data, please wait (this may take 5-8 minutes)...
+            <br><small class="text-muted">Do not close this page during download.</small>
+        `;
+        
+        try {
+            const response = await fetch('/api/download-epg', { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                epgStatusDiv.className = 'alert alert-success mb-4';
+                epgStatusText.innerHTML = `
+                    ✅ EPG data downloaded successfully! (${data.schedule_items} shows available)
+                    <br><small class="text-muted">You can now search and download shows.</small>
+                `;
+                downloadEpgBtn.classList.add('d-none');
+            } else {
+                epgStatusDiv.className = 'alert alert-danger mb-4';
+                epgStatusText.innerHTML = `
+                    ❌ EPG download failed: ${data.message}
+                    <br><small class="text-muted">${data.stderr || ''}</small>
+                `;
+                downloadEpgBtn.disabled = false;
+                downloadEpgBtn.textContent = 'Retry Download';
+            }
+        } catch (error) {
+            console.error('Error downloading EPG:', error);
+            epgStatusDiv.className = 'alert alert-danger mb-4';
+            epgStatusText.innerHTML = `
+                ❌ Error downloading EPG data: ${error.message}
+                <br><small class="text-muted">Please try again or check the logs.</small>
+            `;
+            downloadEpgBtn.disabled = false;
+            downloadEpgBtn.textContent = 'Retry Download';
+        }
+    }
+
+    // Initialize EPG status check
+    // checkEpgStatus();  // Temporarily disabled to avoid 404 errors
+    
+    // Add EPG download button event listener
+    downloadEpgBtn.addEventListener('click', downloadEpg);
 
     // Dark mode functionality
     function initTheme() {
@@ -188,10 +267,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (status === 'completed') {
                     buttonElement.innerHTML = '<span class="download-status status-completed"><span class="checkmark">✓</span> Downloaded</span>';
                     window.activeDownloads.delete(pid);
+                    return; // Stop polling when completed
                 } else if (status === 'failed') {
                     buttonElement.innerHTML = '<span class="download-status status-failed">❌ Failed</span>';
                     buttonElement.disabled = false;
                     window.activeDownloads.delete(pid);
+                    return; // Stop polling when failed
                 } else {
                     // Still in progress, continue polling
                     setTimeout(() => checkDownloadStatus(pid, buttonElement), 3000);
@@ -203,6 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     buttonElement.innerHTML = '<span class="download-status status-failed">❌ Not found</span>';
                     buttonElement.disabled = false;
                     window.activeDownloads.delete(pid);
+                    return; // Stop polling when not found
                 } else {
                     // Other errors, continue polling but less frequently
                     setTimeout(() => checkDownloadStatus(pid, buttonElement), 5000);
