@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  ruvsarpur-web:
+    build: .
+    ports:
+      - "5000:5000"    # Flask frontend
+      - "8001:8001"    # FastAPI backend
+    volumes:
+      # EPG/Schedule data - multiple options for flexibility
+      - ./data:/app/data
+      - ${HOME}/.ruvsarpur:/root/.ruvsarpur
+      - ./data/.ruvsarpur:/app/.ruvsarpur
+      # Downloads directory  
+      - ./downloads:/app/downloads
+      # Mount ruvsarpur source 
+      - ../ruv-container/ruvsarpur/src:/app/ruvsarpur
+    environment:
+      - PYTHONPATH=/app:/app/ruvsarpur
+      - RUVSARPUR_PATH=/app/ruvsarpur
+      - FLASK_ENV=production
+      # Add fallback EPG path
+      - SCHEDULE_FILE_FALLBACK=/app/.ruvsarpur/tvschedule.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3 

@@ -1,0 +1,25 @@
+.navbar {
+    margin-bottom: 2rem;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.list-group-item {
+    transition: background-color 0.2s ease;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.btn-download {
+    min-width: 100px;
+}
+
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+    margin: 2rem auto;
+} 

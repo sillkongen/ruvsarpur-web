@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RÚV Sarpurinn Downloader</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-color: #212529;
+            --text-muted: #6c757d;
+            --border-color: #dee2e6;
+            --list-item-bg: #ffffff;
+            --list-item-hover: #f8f9fa;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #212529;
+            --bg-secondary: #343a40;
+            --text-color: #ffffff;
+            --text-muted: #adb5bd;
+            --border-color: #495057;
+            --list-item-bg: #343a40;
+            --list-item-hover: #495057;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .list-group-item {
+            background-color: var(--list-item-bg);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .list-group-item:hover {
+            background-color: var(--list-item-hover);
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        .file-path {
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 0.85em;
+            background: var(--bg-secondary);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+        }
+        
+        .download-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .status-started {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status-completed {
+            background-color: #d1edff;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+        }
+        
+        .status-failed {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .checkmark {
+            color: #198754;
+            font-weight: bold;
+        }
+        
+        .btn-download {
+            min-width: 140px;
+            white-space: nowrap;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            border: none;
+            background: var(--bg-secondary);
+            color: var(--text-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        [data-theme="dark"] .theme-toggle {
+            box-shadow: 0 2px 10px rgba(255,255,255,0.1);
+        }
+
+        [data-theme="dark"] .theme-toggle:hover {
+            box-shadow: 0 4px 15px rgba(255,255,255,0.2);
+        }
+
+        /* Dark mode adjustments for status badges */
+        [data-theme="dark"] .status-started {
+            background-color: #664d03;
+            color: #fff3cd;
+            border: 1px solid #856404;
+        }
+        
+        [data-theme="dark"] .status-completed {
+            background-color: #0f4229;
+            color: #d1edff;
+            border: 1px solid #198754;
+        }
+        
+        [data-theme="dark"] .status-failed {
+            background-color: #58151c;
+            color: #f8d7da;
+            border: 1px solid #721c24;
+        }
+    </style>
+</head>
+<body>
+    <!-- Dark Mode Toggle -->
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+        <span id="themeIcon">🌙</span>
+    </button>
+
+    <div class="container py-4">
+        <h1 class="mb-4">RÚV Sarpurinn Downloader</h1>
+        
+        <!-- Search Form -->
+        <form id="searchForm" class="mb-4">
+            <div class="input-group">
+                <input type="text" id="searchInput" class="form-control" placeholder="Search for shows...">
+            </div>
+        </form>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="text-center d-none">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div id="results" class="list-group mb-4"></div>
+
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html> 

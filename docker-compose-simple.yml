@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  ruvsarpur-web:
+    build: .
+    ports:
+      - "5000:5000"
+      - "8001:8001"
+    volumes:
+      # Minimal volume mounts - using local copies only
+      - ./downloads:/app/downloads
+      - ./data:/app/data
+      - ./data/.ruvsarpur:/app/.ruvsarpur
+      - ../ruv-container/ruvsarpur/src:/app/ruvsarpur
+    environment:
+      - PYTHONPATH=/app:/app/ruvsarpur
+      - RUVSARPUR_PATH=/app/ruvsarpur
+      - SCHEDULE_FILE_FALLBACK=/app/.ruvsarpur/tvschedule.json
+    restart: unless-stopped 
