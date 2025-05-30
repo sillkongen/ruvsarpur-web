@@ -1,28 +1,43 @@
 # RÚV Sarpurinn Web Downloader
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/sillkongen/ruvsarpur-web/workflows/CI/badge.svg)](https://github.com/sillkongen/ruvsarpur-web/actions)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+
 A modern web interface for downloading shows from RÚV Sarpurinn with instant search and download tracking.
 
-## Features
+**Built on top of [ruvsarpur](https://github.com/sverrirs/ruvsarpur) by [@sverrirs](https://github.com/sverrirs) - the excellent Python script for downloading content from the Icelandic RÚV website.**
+
+## 🌟 Features
 
 - 🔍 **Instant Search**: Lightning-fast search through 30MB+ schedule data loaded in memory
 - 📥 **Download Tracking**: Real-time download status with visual indicators  
 - 🌙 **Dark Mode**: Beautiful dark/light theme toggle with persistent preference
 - 🎯 **Modern UI**: Clean, responsive Bootstrap-based interface
 - ⚡ **Fast Backend**: FastAPI + Flask architecture for optimal performance
+- 🐳 **Docker Ready**: One-command deployment with Docker Compose
 
-## Prerequisites
+## 📸 Demo
+
+![RÚV Web Interface](https://via.placeholder.com/800x400?text=RÚV+Web+Interface+Demo)
+
+*Modern web interface with instant search and dark mode support*
+
+## 🚀 Quick Start
+
+### Prerequisites
 
 This web interface requires the `ruvsarpur` source code to be available. Make sure you have:
 
-1. **ruvsarpur source**: Located at `../ruv-container/ruvsarpur/src` relative to this directory
+1. **ruvsarpur source**: Clone from [https://github.com/sverrirs/ruvsarpur](https://github.com/sverrirs/ruvsarpur)
 2. **EPG data**: Run ruvsarpur at least once to generate `~/.ruvsarpur/tvschedule.json`
 
-## Docker Deployment
+### Docker Deployment (Recommended)
 
-### Quick Start
-
-1. **Clone and setup:**
+1. **Clone this repository:**
    ```bash
+   git clone https://github.com/sillkongen/ruvsarpur-web.git
    cd ruvsarpur-web
    mkdir -p downloads data
    ```
@@ -48,6 +63,46 @@ This web interface requires the `ruvsarpur` source code to be available. Make su
    - Web interface: http://localhost:5000
    - API backend: http://localhost:8001
 
+### Manual Development
+
+If you prefer to run without Docker:
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Start backend:**
+   ```bash
+   cd backend
+   uvicorn app.main:app --reload --workers 1 --port 8001
+   ```
+
+3. **Start frontend:**
+   ```bash
+   python app.py
+   ```
+
+## 📁 Project Structure
+
+```
+ruvsarpur-web/
+├── app.py                  # Flask frontend application
+├── backend/                # FastAPI backend
+│   └── app/
+│       └── main.py        # API endpoints and download logic
+├── templates/             # HTML templates
+├── static/               # CSS, JS, and assets
+├── database.py           # SQLite database operations
+├── downloads/            # Downloaded videos (mounted volume)
+├── data/                # Application data and EPG cache
+├── docker-compose.yml   # Docker deployment configuration
+├── Dockerfile           # Container build instructions
+└── setup-epg.sh        # EPG data setup script
+```
+
+## 🔧 Configuration
+
 ### EPG Data Handling
 
 The application looks for EPG data in multiple locations:
@@ -57,13 +112,6 @@ The application looks for EPG data in multiple locations:
 - `/app/.ruvsarpur/tvschedule.json` (fallback location)
 
 Use `./setup-epg.sh` to copy your EPG data locally if volume mounting doesn't work.
-
-### Volume Mounts
-
-- `./downloads` → `/app/downloads` (Downloaded video files - **accessible outside container**)
-- `./data` → `/app/data` (Application data)
-- `~/.ruvsarpur` → `/root/.ruvsarpur` (EPG/Schedule cache)
-- `../ruv-container/ruvsarpur/src` → `/app/ruvsarpur` (ruvsarpur source code)
 
 ### Download Location
 
@@ -92,33 +140,20 @@ ls -la downloads/
 ls -la downloads/*.mp4
 ```
 
+### Volume Mounts
+
+- `./downloads` → `/app/downloads` (Downloaded video files - **accessible outside container**)
+- `./data` → `/app/data` (Application data)
+- `~/.ruvsarpur` → `/root/.ruvsarpur` (EPG/Schedule cache)
+- `../ruv-container/ruvsarpur/src` → `/app/ruvsarpur` (ruvsarpur source code)
+
 ### Environment Variables
 
 - `RUVSARPUR_PATH`: Path to ruvsarpur script (default: `/app/ruvsarpur`)
 - `SCHEDULE_FILE`: Path to TV schedule JSON (default: `~/.ruvsarpur/tvschedule.json`)
 - `FLASK_ENV`: Flask environment (default: `production`)
 
-## Manual Development
-
-If you prefer to run without Docker:
-
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Start backend:**
-   ```bash
-   cd backend
-   uvicorn app.main:app --reload --workers 1 --port 8001
-   ```
-
-3. **Start frontend:**
-   ```bash
-   python app.py
-   ```
-
-## Architecture
+## 🏗️ Architecture
 
 - **Frontend**: Flask app serving the web interface
 - **Backend**: FastAPI handling search and downloads  
@@ -135,7 +170,7 @@ python ruvsarpur.py --pid <program_id> --output /app/downloads --quality HD1080
 
 The `/app/downloads` path is mounted to `./downloads` on your host, ensuring files are accessible outside the container.
 
-## Usage
+## 🎯 Usage
 
 1. Type in the search box (minimum 2 characters)
 2. Browse instant search results  
@@ -143,5 +178,31 @@ The `/app/downloads` path is mounted to `./downloads` on your host, ensuring fil
 4. Watch real-time status updates
 5. Toggle dark mode with the moon/sun button
 6. **Find your downloads**: Check the `./downloads` folder in your current directory
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **[ruvsarpur](https://github.com/sverrirs/ruvsarpur)** by [@sverrirs](https://github.com/sverrirs) - The core Python script that makes this web interface possible
+- **RÚV (Ríkisútvarpið)** - Iceland's national public-service broadcasting organization
+- All contributors who helped improve this project
+
+## ⚖️ Legal Notice
+
+This tool is for educational and personal use only. Please respect RÚV's terms of service and copyright. The authors are not responsible for any misuse of this software.
+
+---
 
 Built with ❤️ for easy RÚV content downloading. 
