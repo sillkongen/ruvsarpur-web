@@ -80,6 +80,15 @@ downloads/
 *.sqlite
 *.sqlite3
 
+# EPG/Schedule data (COPYRIGHTED - NEVER COMMIT)
+**/tvschedule.json
+**/tvschedule*.json
+**/.ruvsarpur/
+.ruvsarpur/
+# Any RÚV EPG data files
+*epg*
+*schedule*
+
 # Logs
 *.log
 logs/

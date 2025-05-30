@@ -105,13 +105,15 @@ ruvsarpur-web/
 
 ### EPG Data Handling
 
+⚠️ **IMPORTANT**: EPG schedule data is copyrighted by RÚV and is **NOT included** in this repository.
+
 The application looks for EPG data in multiple locations:
 - `${HOME}/.ruvsarpur/tvschedule.json` (mounted from host)
-- `./data/.ruvsarpur/tvschedule.json` (local copy)
+- `./data/.ruvsarpur/tvschedule.json` (local copy - **excluded from Git**)
 - `/root/.ruvsarpur/tvschedule.json` (inside container)
 - `/app/.ruvsarpur/tvschedule.json` (fallback location)
 
-Use `./setup-epg.sh` to copy your EPG data locally if volume mounting doesn't work.
+Use `./setup-epg.sh` to copy your EPG data locally. This data is automatically excluded from version control to respect RÚV's copyright.
 
 ### Download Location
 

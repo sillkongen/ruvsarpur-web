@@ -1,8 +1,10 @@
 #!/bin/bash
 
 # Setup script for RÚV Web EPG data
+# ⚠️  COPYRIGHT NOTICE: EPG data is copyrighted by RÚV and should NEVER be committed to version control
 
 echo "Setting up EPG data for RÚV Web..."
+echo "⚠️  Note: EPG data is copyrighted by RÚV and excluded from version control"
 
 # Create data directory if it doesn't exist
 mkdir -p data/.ruvsarpur
@@ -13,6 +15,7 @@ if [ -f "$HOME/.ruvsarpur/tvschedule.json" ]; then
     echo "Copying to local data directory..."
     cp "$HOME/.ruvsarpur/tvschedule.json" "data/.ruvsarpur/"
     echo "EPG data copied successfully!"
+    echo "⚠️  This data is excluded from Git and will NOT be committed"
 else
     echo "ERROR: No EPG data found at $HOME/.ruvsarpur/tvschedule.json"
     echo "Please run ruvsarpur at least once to generate the EPG data:"
