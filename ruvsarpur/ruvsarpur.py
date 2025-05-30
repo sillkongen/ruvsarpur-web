@@ -53,6 +53,7 @@ from requests.packages.urllib3.util.retry import Retry # For Retrying
 
 import subprocess # To execute shell commands 
 from itertools import (takewhile,repeat) # To count lines for the extremely large IMDB files 
+import concurrent.futures
 
 # Disable SSL warnings
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -905,16 +906,7 @@ RE_CAPTURE_VOD_EPNUM_FROM_TITLE = re.compile(r'(?P<ep_num>\d+) af (?P<ep_total>\
 # Downloads the full front page VOD schedule and for each episode in there fetches all available episodes
 # uses the new RUV GraphQL queries
 def getVodSchedule(existing_schedule, args_incremental_refresh=False, imdb_cache=None, imdb_orignal_titles=None):
-
-  # Start with getting all the series available on RUV through their API, this gives us basic information about each of the series
-  # https://api.ruv.is/api/programs/tv/all
-  # as of 2024-01-15 this API is now 
-  # https://api.ruv.is/api/programs/featured/tv
-
-  # Now for each series we request the series information, to obtain more than the basic info, 
-  # note: today there is a single episode returned which cannot be used when dealing with multi episode series, we should request all episodes as a second call
-  # https://api.ruv.is/api/programs/get_ids/32978
-
+  # Start with getting all the series available on RUV through their API
   ruv_api_url_all = 'https://api.ruv.is/api/programs/featured/tv'
   r = __create_retry_session().get(ruv_api_url_all)  
   api_data = r.json()
@@ -946,43 +938,48 @@ def getVodSchedule(existing_schedule, args_incremental_refresh=False, imdb_cache
   # Filter out all programs that do not have any vod files to download and have an id field
   panels = [p for p in data if 'web_available_episodes' in p and 'id' in p and p['web_available_episodes'] > 0]
 
+  # If doing incremental update, filter out programs that haven't changed
+  if args_incremental_refresh:
+    filtered_panels = []
+    for program in panels:
+      existing_vod_episodes_count = sum(type(schedule[p]) is dict and schedule[p]['sid'] == str(program['id']) for p in schedule)
+      if program['web_available_episodes'] > existing_vod_episodes_count:
+        filtered_panels.append(program)
+        print(f"Detected {program['web_available_episodes'] - existing_vod_episodes_count} new entries for {color_sid(program['title'])}")
+    panels = filtered_panels
+
   completed_programs = 0
   total_programs = len(panels)
   
-  print("{0} | Total: {1} series available".format(color_title('Downloading VOD schedule'), total_programs))
+  if total_programs == 0:
+    print("No new content found in incremental update")
+    return schedule
+
+  print("{0} | Total: {1} series to update".format(color_title('Downloading VOD schedule'), total_programs))
   printProgress(completed_programs, total_programs, prefix = 'Reading:', suffix = '', barLength = 25)
 
-  # Now iterate first through every group and for every thing in the group request all episodes for that 
-  # item (there is no programmatic way of distinguishing between how many episodes there are)
-  for program in panels:
-    completed_programs += 1
+  # Use ThreadPoolExecutor to parallelize the API calls
+  with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    # Create a list to store the future objects
+    future_to_program = {
+      executor.submit(getVodSeriesSchedule, program['id'], program, imdb_cache, imdb_orignal_titles): program 
+      for program in panels
+    }
 
-    #if str(program['id']) != '32957': 
-    #  continue
-
-    # If incremental, then check if we already have this series if we don't we want to add it, 
-    # if we have the series check if the web_available_episodes match if not then we want to re-add it
-    if args_incremental_refresh:
-      existing_vod_episodes_count = sum(type(schedule[p]) is dict and schedule[p]['sid'] == str(program['id']) for p in schedule)
-      if( program['web_available_episodes'] <= existing_vod_episodes_count and existing_vod_episodes_count > 0 ):
-        continue
-      else:
-        existing_vs_new_diff = program['web_available_episodes'] - existing_vod_episodes_count
-        printProgress(completed_programs, total_programs, prefix = 'Detected {0} new entries for {1}:'.format(existing_vs_new_diff, color_sid(program['title'])), suffix ='', barLength = 25)
-
-    # Add all details for the given program to the schedule
-    try:
-      # We want to not override existing items in the schedule dictionary in case they are downloaded again
-      program_schedule = getVodSeriesSchedule(program['id'], program, imdb_cache, imdb_orignal_titles)
-      # This joining of the two dictionaries below is necessary to ensure that 
-      # the existing items are not overwritten, therefore schedule is appended to the new list, existing items overwriting any new items.
-      #schedule = dict(list(program_schedule.items()) + list(schedule.items())) 
-      schedule.update(program_schedule) # Want to override existing keys again!
-    except Exception as ex:
-        print( "Unable to retrieve schedule for VOD program '{0}', no episodes will be available for download from this program.".format(program['title']))
+    # Process the results as they complete
+    for future in concurrent.futures.as_completed(future_to_program):
+      program = future_to_program[future]
+      completed_programs += 1
+      
+      try:
+        program_schedule = future.result()
+        if program_schedule:
+          schedule.update(program_schedule)
+      except Exception as ex:
+        print(f"Unable to retrieve schedule for VOD program '{program['title']}', no episodes will be available for download from this program.")
         print(traceback.format_exc())
-        continue
-    printProgress(completed_programs, total_programs, prefix = 'Reading:', suffix ='', barLength = 25)
+      
+      printProgress(completed_programs, total_programs, prefix = 'Reading:', suffix ='', barLength = 25)
 
   return schedule
 
@@ -1288,7 +1285,7 @@ def loadImdbOriginalTitles(args_imdbfolder):
 #    originalTitle (string) - original title, in the original language
 #    isAdult (boolean) - 0: non-adult title; 1: adult title
 #    startYear (YYYY) – represents the release year of a title. In the case of TV Series, it is the series start year
-#    endYear (YYYY) – TV Series end year. ‘\N’ for all other title types
+#    endYear (YYYY) – TV Series end year. 'N' for all other title types
 #    runtimeMinutes – primary runtime of the title, in minutes
 #    genres (string array) – includes up to three genres associated with the title
 
