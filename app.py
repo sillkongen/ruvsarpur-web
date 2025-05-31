@@ -9,7 +9,7 @@ app = Flask(__name__)
 BACKEND_URL = "http://localhost:8001"  # FastAPI backend URL
 
 # Default download directory (absolute path for container)
-DEFAULT_DOWNLOAD_DIR = "/app/downloads"
+DEFAULT_DOWNLOAD_DIR = "/app/backend/downloads"
 
 @app.route('/')
 def index():

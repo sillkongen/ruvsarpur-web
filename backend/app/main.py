@@ -14,17 +14,23 @@ from pydantic import BaseModel, field_validator
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Add the ruvsarpur directory to Python path and find the script
-RUVSARPUR_PATH = os.environ.get('RUVSARPUR_PATH', os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "ruv-container", "ruvsarpur", "src"))
-RUVSARPUR_SCRIPT = os.path.join(RUVSARPUR_PATH, "ruvsarpur.py")
+# Get ruvsarpur paths from environment
+RUVSARPUR_PATH = os.environ.get('RUVSARPUR_PATH', '/app/ruvsarpur')
+RUVSARPUR_SCRIPT = os.environ.get('RUVSARPUR_SCRIPT', os.path.join(RUVSARPUR_PATH, 'ruvsarpur.py'))
 
 # Path to the schedule JSON file
 SCHEDULE_FILE = os.environ.get('SCHEDULE_FILE', "/home/appuser/.ruvsarpur/tvschedule.json")
 SCHEDULE_FILE_FALLBACK = os.environ.get('SCHEDULE_FILE_FALLBACK', "/app/data/.ruvsarpur/tvschedule.json")
 
+# Default download directory
+DEFAULT_DOWNLOAD_DIR = "/app/backend/downloads"
+
 # Verify the script exists
 if not os.path.exists(RUVSARPUR_SCRIPT):
     raise FileNotFoundError(f"Could not find ruvsarpur.py script at: {RUVSARPUR_SCRIPT}")
+
+# Create downloads directory if it doesn't exist
+os.makedirs(DEFAULT_DOWNLOAD_DIR, exist_ok=True)
 
 # Global variable to hold the schedule data in memory
 schedule_data: Dict = {}
@@ -81,7 +87,7 @@ app.add_middleware(
 class DownloadRequest(BaseModel):
     pid: str
     quality: str = "HD1080"
-    output_dir: str = "/app/downloads"  # Always use absolute path in container
+    output_dir: str = DEFAULT_DOWNLOAD_DIR  # Use the default download directory
 
     @field_validator('pid')
     @classmethod
