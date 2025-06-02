@@ -8,28 +8,37 @@ mkdir -p /app/data/.ruvsarpur /home/appuser/.ruvsarpur /app/backend/downloads
 chmod -R 777 /app/backend/downloads
 chown -R appuser:appuser /app/data/.ruvsarpur /home/appuser/.ruvsarpur
 
-# Run ruvsarpur as appuser
-if [ ! -f /home/appuser/.ruvsarpur/tvschedule.json ]; then
-    echo "No EPG data found. Downloading initial EPG data..."
-    echo "This may take 15-20 seconds..."
-    
-    # Use ruvsarpur to fetch latest EPG data
+# Function to refresh EPG data
+refresh_epg() {
+    echo "Refreshing EPG data..."
     cd /app/ruvsarpur
-    # Run as appuser with --list to prevent downloading shows
     su - appuser -c "cd /app/ruvsarpur && python3 ruvsarpur.py --refresh --list"
-    
-    # Check if download was successful
-    if [ -f /home/appuser/.ruvsarpur/tvschedule.json ]; then
-        # Copy to data directory for persistence (as root)
+    if [ $? -eq 0 ]; then
         cp /home/appuser/.ruvsarpur/tvschedule.json /app/data/.ruvsarpur/
         chown appuser:appuser /app/data/.ruvsarpur/tvschedule.json
-        echo "✅ EPG data downloaded successfully!"
+        echo "✅ EPG data refreshed successfully!"
     else
-        echo "❌ Failed to download EPG data"
+        echo "❌ Failed to refresh EPG data"
         exit 1
     fi
+}
+
+# Check if EPG data exists and its age
+if [ -f /home/appuser/.ruvsarpur/tvschedule.json ]; then
+    # Get file age in hours
+    file_age_hours=$(( ($(date +%s) - $(stat -c %Y /home/appuser/.ruvsarpur/tvschedule.json)) / 3600 ))
+    echo "EPG data is ${file_age_hours} hours old"
+    
+    # Refresh if older than 4 hours
+    if [ $file_age_hours -gt 4 ]; then
+        echo "EPG data is more than 4 hours old, refreshing..."
+        refresh_epg
+    else
+        echo "EPG data is recent enough, proceeding with startup..."
+    fi
 else
-    echo "EPG data found, proceeding with startup..."
+    echo "No EPG data found. Downloading initial EPG data..."
+    refresh_epg
 fi
 
 # Switch to appuser and start both services
