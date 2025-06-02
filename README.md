@@ -78,12 +78,12 @@ If no EPG data exists, the first download will fetch it (5-8 minutes).
 ### Download Location
 
 Downloaded files will be saved to `./downloads` in your current directory.
-
+ctually an important file that should typically be included in version control, not ignored. It contains the instructions for building your application's Docker container and is a crucial part of your ap
 
 ## Todo
 
 1. EPG bits/refresh/webui
-2. Proper non root user setup
+2. Proper non root user setup within container
 
 
 ## License
