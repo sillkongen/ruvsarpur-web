@@ -79,6 +79,13 @@ If no EPG data exists, the first download will fetch it (5-8 minutes).
 
 Downloaded files will be saved to `./downloads` in your current directory.
 
+
+## Todo
+
+1. EPG bits/refresh/webui
+2. Proper non root user setup
+
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
