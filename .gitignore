@@ -17,7 +17,7 @@ sdist/
 var/
 wheels/
 pip-wheel-metadata/
-share/python-wheels/
+share/python-wheels/o
 *.egg-info/
 .installed.cfg
 *.egg
@@ -28,6 +28,7 @@ MANIFEST
 *.spec
 
 database.db
+downloads.db
 
 # Installer logs
 pip-log.txt
