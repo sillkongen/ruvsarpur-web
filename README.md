@@ -47,6 +47,14 @@ A modern web interface for downloading shows from RÚV Sarpurinn with instant se
    - Web interface: http://localhost:5000
    - API backend: http://localhost:8001
 
+## Screenshots
+
+### Light Mode
+![Light Mode Interface](screenshots/Screenshot.png)
+
+### Dark Mode
+![Dark Mode Interface](screenshots/Screenshot_dark_mode.png)
+
 ## Project Structure
 
 ```
