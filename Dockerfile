@@ -4,11 +4,13 @@ FROM python:3.12-slim
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies with better error handling
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Create a non-root user matching host user
 RUN groupadd -g ${GROUP_ID} appuser && \
