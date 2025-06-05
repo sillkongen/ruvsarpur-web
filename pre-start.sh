@@ -1,63 +1,34 @@
 #!/bin/bash
 
-# Get the absolute path of the script's directory
+# Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-echo "Current directory: $(pwd)"
-echo "Script directory: ${SCRIPT_DIR}"
+echo "Script directory: $SCRIPT_DIR"
 
 # Create necessary directories with proper permissions
-echo "Creating directories..."
-mkdir -p "${SCRIPT_DIR}/data/epg"
-mkdir -p "${SCRIPT_DIR}/downloads"
-mkdir -p "${SCRIPT_DIR}/data/.ruvsarpur"
+echo "Creating and setting permissions for data directories..."
 
-# Verify directories exist
-echo "Verifying directories..."
-if [ ! -d "${SCRIPT_DIR}/data/epg" ]; then
-    echo "ERROR: Failed to create ${SCRIPT_DIR}/data/epg"
-    exit 1
-fi
-if [ ! -d "${SCRIPT_DIR}/downloads" ]; then
-    echo "ERROR: Failed to create ${SCRIPT_DIR}/downloads"
-    exit 1
-fi
-if [ ! -d "${SCRIPT_DIR}/data/.ruvsarpur" ]; then
-    echo "ERROR: Failed to create ${SCRIPT_DIR}/data/.ruvsarpur"
-    exit 1
-fi
+# Create directories if they don't exist
+mkdir -p "$SCRIPT_DIR/data/epg"
+mkdir -p "$SCRIPT_DIR/downloads"
+mkdir -p "$SCRIPT_DIR/data/.ruvsarpur"
 
-# Set permissions to 777 for all directories
-echo "Setting permissions..."
-chmod -R 777 "${SCRIPT_DIR}/data/epg"
-chmod -R 777 "${SCRIPT_DIR}/downloads"
-chmod -R 777 "${SCRIPT_DIR}/data"
-chmod -R 777 "${SCRIPT_DIR}/data/.ruvsarpur"
+# Set permissions for all directories
+echo "Setting permissions for data directories..."
+chmod -R 777 "$SCRIPT_DIR/data"
+chmod -R 777 "$SCRIPT_DIR/downloads"
 
-# Ensure the host directory is owned by the correct user
-echo "Setting ownership..."
-if [ "$(id -u)" = "0" ]; then
-    echo "Running as root, setting ownership..."
-    chown -R 501:501 "${SCRIPT_DIR}/data/epg"
-    chown -R 501:501 "${SCRIPT_DIR}/downloads"
-    chown -R 501:501 "${SCRIPT_DIR}/data"
-    chown -R 501:501 "${SCRIPT_DIR}/data/.ruvsarpur"
+# If running as root, change ownership to match the container user (UID 501)
+if [ "$EUID" -eq 0 ]; then
+    echo "Running as root, setting ownership to UID 501..."
+    chown -R 501:501 "$SCRIPT_DIR/data"
+    chown -R 501:501 "$SCRIPT_DIR/downloads"
 else
-    # If not running as root, try to use sudo
-    if command -v sudo >/dev/null 2>&1; then
-        echo "Using sudo to set ownership..."
-        sudo chown -R 501:501 "${SCRIPT_DIR}/data/epg"
-        sudo chown -R 501:501 "${SCRIPT_DIR}/downloads"
-        sudo chown -R 501:501 "${SCRIPT_DIR}/data"
-        sudo chown -R 501:501 "${SCRIPT_DIR}/data/.ruvsarpur"
-    fi
+    echo "Not running as root, ownership will be inherited from parent directory"
 fi
 
-echo "Directory permissions set up complete"
-echo "Directory structure:"
-tree "${SCRIPT_DIR}/data" "${SCRIPT_DIR}/downloads"
-echo "Directory permissions:"
-ls -la "${SCRIPT_DIR}/data/epg"
-ls -la "${SCRIPT_DIR}/downloads"
-ls -la "${SCRIPT_DIR}/data"
-ls -la "${SCRIPT_DIR}/data/.ruvsarpur" 
+# Verify the directories exist and have correct permissions
+echo "Verifying directory permissions:"
+ls -la "$SCRIPT_DIR/data"
+ls -la "$SCRIPT_DIR/downloads"
+
+echo "Pre-start script completed successfully" 
