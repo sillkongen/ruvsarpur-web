@@ -15,12 +15,23 @@ services:
       - "8001:8001"    # FastAPI backend
     volumes:
       # EPG/Schedule data - persist in host user's home directory, mounted to appuser in container
-      - ${HOME}/.ruvsarpur:/home/appuser/.ruvsarpur
+      - type: bind
+        source: ${HOME}/.ruvsarpur
+        target: /home/appuser/.ruvsarpur
+        bind:
+          create_host_path: true
       # Downloads directory - persist in host's downloads directory  
-      - ./downloads:/app/downloads/
+      - type: bind
+        source: ./downloads
+        target: /app/downloads
+        bind:
+          create_host_path: true
       # Local data directory as fallback
-      - ./data:/app/data
-      # ruvsarpur is now included in the repository - no external mount needed
+      - type: bind
+        source: ./data
+        target: /app/data
+        bind:
+          create_host_path: true
     environment:
       - PYTHONPATH=/app:/app/ruvsarpur
       - RUVSARPUR_PATH=/app/ruvsarpur
