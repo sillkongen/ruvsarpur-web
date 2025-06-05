@@ -16,9 +16,16 @@ RUN apt-get update && \
 RUN groupadd -g ${GROUP_ID} appuser && \
     useradd -u ${USER_ID} -g ${GROUP_ID} -m appuser
 
-# Create necessary directories for the non-root user
+# Create necessary directories and set permissions BEFORE switching to non-root user
 RUN mkdir -p /home/appuser/.ruvsarpur && \
-    chown appuser:appuser /home/appuser/.ruvsarpur
+    mkdir -p /app/backend/downloads && \
+    mkdir -p /app/data/.ruvsarpur && \
+    chown -R appuser:appuser /home/appuser/.ruvsarpur && \
+    chown -R appuser:appuser /app/backend/downloads && \
+    chown -R appuser:appuser /app/data/.ruvsarpur && \
+    chmod -R 777 /app/backend/downloads && \
+    chmod -R 777 /app/data/.ruvsarpur && \
+    chmod -R 777 /home/appuser/.ruvsarpur
 
 # Set working directory
 WORKDIR /app
@@ -44,10 +51,8 @@ RUN pip install --no-cache-dir \
 # Copy the application code (including ruvsarpur)
 COPY . /app/
 
-# Create necessary directories and set all permissions properly
-RUN mkdir -p /app/backend/downloads /app/data /app/data/.ruvsarpur && \
-    chmod -R 777 /app/backend/downloads && \
-    chmod +x /app/ruvsarpur/ruvsarpur.py && \
+# Set permissions for application files
+RUN chmod +x /app/ruvsarpur/ruvsarpur.py && \
     chown -R appuser:appuser /app && \
     chmod -R 755 /app
 

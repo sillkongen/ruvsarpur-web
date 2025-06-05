@@ -3,18 +3,8 @@
 echo "Starting RÚV Web UI..."
 echo "Running as user: $(whoami) (UID: $(id -u), GID: $(id -g))"
 
-# Create necessary directories with correct permissions first
-# Use sudo if available, otherwise try without
-if command -v sudo >/dev/null 2>&1; then
-    sudo mkdir -p /app/data/.ruvsarpur /home/appuser/.ruvsarpur /app/backend/downloads
-    sudo chmod -R 777 /app/backend/downloads
-    sudo chown -R $(id -u):$(id -g) /app/data/.ruvsarpur /home/appuser/.ruvsarpur
-else
-    # Try to create directories without sudo
-    mkdir -p /home/appuser/.ruvsarpur /app/backend/downloads
-    chmod -R 777 /app/backend/downloads
-    # Don't try to change ownership if we don't have permission
-fi
+# Create necessary directories if they don't exist
+mkdir -p /app/data/.ruvsarpur /home/appuser/.ruvsarpur /app/backend/downloads
 
 # Function to refresh EPG data
 refresh_epg() {
@@ -23,14 +13,8 @@ refresh_epg() {
     # Run directly as current user
     python3 ruvsarpur.py --refresh --list
     if [ $? -eq 0 ]; then
-        # Try to copy with sudo if available
-        if command -v sudo >/dev/null 2>&1; then
-            sudo cp /home/appuser/.ruvsarpur/tvschedule.json /app/data/.ruvsarpur/
-            sudo chown $(id -u):$(id -g) /app/data/.ruvsarpur/tvschedule.json
-        else
-            # Try without sudo
-            cp /home/appuser/.ruvsarpur/tvschedule.json /app/data/.ruvsarpur/ 2>/dev/null || true
-        fi
+        # Copy the schedule file to the fallback location
+        cp /home/appuser/.ruvsarpur/tvschedule.json /app/data/.ruvsarpur/ 2>/dev/null || true
         echo "✅ EPG data refreshed successfully!"
     else
         echo "❌ Failed to refresh EPG data"
