@@ -15,17 +15,11 @@ services:
       - "8001:8001"    # FastAPI backend
     volumes:
       # EPG/Schedule data - use local directory
-      - type: bind
-        source: ${PWD}/data/epg
-        target: /home/appuser/.ruvsarpur
+      - ./data/epg:/home/appuser/.ruvsarpur
       # Downloads directory - persist in host's downloads directory  
-      - type: bind
-        source: ${PWD}/downloads
-        target: /app/downloads
+      - ./downloads:/app/downloads
       # Local data directory as fallback
-      - type: bind
-        source: ${PWD}/data
-        target: /app/data
+      - ./data:/app/data
     environment:
       - PYTHONPATH=/app:/app/ruvsarpur
       - RUVSARPUR_PATH=/app/ruvsarpur
