@@ -18,20 +18,14 @@ services:
       - type: bind
         source: ${HOME}/.ruvsarpur
         target: /home/appuser/.ruvsarpur
-        bind:
-          create_host_path: true
       # Downloads directory - persist in host's downloads directory  
       - type: bind
         source: ./downloads
         target: /app/downloads
-        bind:
-          create_host_path: true
       # Local data directory as fallback
       - type: bind
         source: ./data
         target: /app/data
-        bind:
-          create_host_path: true
     environment:
       - PYTHONPATH=/app:/app/ruvsarpur
       - RUVSARPUR_PATH=/app/ruvsarpur
