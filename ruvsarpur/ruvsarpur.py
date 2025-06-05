@@ -726,11 +726,26 @@ def saveCurrentTvSchedule(schedule,tv_file_name):
   # Format the date field
   schedule['date'] = today.strftime('%Y-%m-%d')
 
-  #make sure that the log directory exists
-  os.makedirs(os.path.dirname(tv_file_name), exist_ok=True)
-
-  with open(tv_file_name, 'w+', encoding='utf-8') as out_file:
-    out_file.write(json.dumps(schedule, ensure_ascii=False, sort_keys=True, indent=2*' '))
+  # Make sure that the log directory exists
+  try:
+    os.makedirs(os.path.dirname(tv_file_name), exist_ok=True)
+    # Try to write the file
+    with open(tv_file_name, 'w+', encoding='utf-8') as out_file:
+      out_file.write(json.dumps(schedule, ensure_ascii=False, sort_keys=True, indent=2*' '))
+  except PermissionError:
+    # If we get a permission error, try the fallback location
+    fallback_file = os.path.join('/app/data/.ruvsarpur', os.path.basename(tv_file_name))
+    try:
+      os.makedirs(os.path.dirname(fallback_file), exist_ok=True)
+      with open(fallback_file, 'w+', encoding='utf-8') as out_file:
+        out_file.write(json.dumps(schedule, ensure_ascii=False, sort_keys=True, indent=2*' '))
+      print(f"Wrote schedule to fallback location: {fallback_file}")
+    except Exception as e:
+      print(f"Failed to write schedule to fallback location: {e}")
+      raise
+  except Exception as e:
+    print(f"Failed to write schedule: {e}")
+    raise
 
 def saveImdbCache(imdb_cache, imdb_cache_file_name):
   os.makedirs(os.path.dirname(imdb_cache_file_name), exist_ok=True)
@@ -753,6 +768,7 @@ def getExistingJsonFile(file_name):
     return None
 
 def getExistingTvSchedule(tv_file_name):
+  # Try the primary location first
   try:
     tv_file = Path(tv_file_name)
     if tv_file.is_file():
@@ -763,10 +779,24 @@ def getExistingTvSchedule(tv_file_name):
       existing['date'] = datetime.datetime.strptime(existing['date'], '%Y-%m-%d')
       
       return existing
-    else:
-      return None
-  except:
-    print("Could not open existing tv schedule, downloading new one (invalid file at "+tv_file_name+")")
+  except Exception as e:
+    print(f"Could not open primary schedule file: {e}")
+    
+    # Try the fallback location
+    try:
+      fallback_file = Path('/app/data/.ruvsarpur') / Path(tv_file_name).name
+      if fallback_file.is_file():
+        with fallback_file.open('r+',encoding='utf-8') as in_file:
+          existing = json.load(in_file)
+        
+        # format the date field
+        existing['date'] = datetime.datetime.strptime(existing['date'], '%Y-%m-%d')
+        
+        return existing
+    except Exception as e:
+      print(f"Could not open fallback schedule file: {e}")
+    
+    print("Could not open existing tv schedule, downloading new one")
     return None
     
 def sanitizeFileName(local_filename, sep=" "):
