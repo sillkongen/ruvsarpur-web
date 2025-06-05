@@ -4,19 +4,33 @@ echo "Starting RÚV Web UI..."
 echo "Running as user: $(whoami) (UID: $(id -u), GID: $(id -g))"
 
 # Create necessary directories with correct permissions first
-mkdir -p /app/data/.ruvsarpur /home/appuser/.ruvsarpur /app/backend/downloads
-chmod -R 777 /app/backend/downloads
-chown -R appuser:appuser /app/data/.ruvsarpur /home/appuser/.ruvsarpur
+# Use sudo if available, otherwise try without
+if command -v sudo >/dev/null 2>&1; then
+    sudo mkdir -p /app/data/.ruvsarpur /home/appuser/.ruvsarpur /app/backend/downloads
+    sudo chmod -R 777 /app/backend/downloads
+    sudo chown -R $(id -u):$(id -g) /app/data/.ruvsarpur /home/appuser/.ruvsarpur
+else
+    # Try to create directories without sudo
+    mkdir -p /home/appuser/.ruvsarpur /app/backend/downloads
+    chmod -R 777 /app/backend/downloads
+    # Don't try to change ownership if we don't have permission
+fi
 
 # Function to refresh EPG data
 refresh_epg() {
     echo "Refreshing EPG data..."
     cd /app/ruvsarpur
-    # Run directly as current user (should be appuser)
+    # Run directly as current user
     python3 ruvsarpur.py --refresh --list
     if [ $? -eq 0 ]; then
-        cp /home/appuser/.ruvsarpur/tvschedule.json /app/data/.ruvsarpur/
-        chown appuser:appuser /app/data/.ruvsarpur/tvschedule.json
+        # Try to copy with sudo if available
+        if command -v sudo >/dev/null 2>&1; then
+            sudo cp /home/appuser/.ruvsarpur/tvschedule.json /app/data/.ruvsarpur/
+            sudo chown $(id -u):$(id -g) /app/data/.ruvsarpur/tvschedule.json
+        else
+            # Try without sudo
+            cp /home/appuser/.ruvsarpur/tvschedule.json /app/data/.ruvsarpur/ 2>/dev/null || true
+        fi
         echo "✅ EPG data refreshed successfully!"
     else
         echo "❌ Failed to refresh EPG data"
@@ -45,14 +59,10 @@ fi
 # Export PYTHONPATH to include backend directory
 export PYTHONPATH=/app:/app/backend:/app/ruvsarpur
 
-# Start both services directly (we're already running as appuser)
+# Start both services directly
 # Start FastAPI backend
 cd /app
 echo "Starting FastAPI backend..."
-echo "Current directory: $(pwd)"
-echo "Python path: $PYTHONPATH"
-echo "Listing backend directory:"
-ls -la /app/backend/app/
 python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8001 &
 
 # Wait a moment for backend to start

@@ -5,10 +5,11 @@ services:
     build: 
       context: .
       args:
-        - USER_ID=${USER_ID:-1000}
-        - GROUP_ID=${GROUP_ID:-1000}
+        - USER_ID=501
+        - GROUP_ID=501
     image: sillkongen/ruvsarpur-web:latest
     container_name: ruvsarpur-web
+    user: "501:501"  # Run as the host user
     ports:
       - "5000:5000"    # Flask frontend
       - "8001:8001"    # FastAPI backend
