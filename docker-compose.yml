@@ -16,15 +16,15 @@ services:
     volumes:
       # EPG/Schedule data - use local directory
       - type: bind
-        source: ./data/epg
+        source: ${PWD}/data/epg
         target: /home/appuser/.ruvsarpur
       # Downloads directory - persist in host's downloads directory  
       - type: bind
-        source: ./downloads
+        source: ${PWD}/downloads
         target: /app/downloads
       # Local data directory as fallback
       - type: bind
-        source: ./data
+        source: ${PWD}/data
         target: /app/data
     environment:
       - PYTHONPATH=/app:/app/ruvsarpur
