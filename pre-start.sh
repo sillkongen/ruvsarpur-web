@@ -27,18 +27,21 @@ if [ ! -d "${SCRIPT_DIR}/data/.ruvsarpur" ]; then
     exit 1
 fi
 
-# Set permissions
+# Set permissions to 777 for all directories
 echo "Setting permissions..."
 chmod -R 777 "${SCRIPT_DIR}/data/epg"
 chmod -R 777 "${SCRIPT_DIR}/downloads"
 chmod -R 777 "${SCRIPT_DIR}/data"
+chmod -R 777 "${SCRIPT_DIR}/data/.ruvsarpur"
 
-# If running as root, ensure directories are owned by the correct user
+# Ensure the host directory is owned by the correct user
+echo "Setting ownership..."
 if [ "$(id -u)" = "0" ]; then
     echo "Running as root, setting ownership..."
     chown -R 501:501 "${SCRIPT_DIR}/data/epg"
     chown -R 501:501 "${SCRIPT_DIR}/downloads"
     chown -R 501:501 "${SCRIPT_DIR}/data"
+    chown -R 501:501 "${SCRIPT_DIR}/data/.ruvsarpur"
 else
     # If not running as root, try to use sudo
     if command -v sudo >/dev/null 2>&1; then
@@ -46,6 +49,7 @@ else
         sudo chown -R 501:501 "${SCRIPT_DIR}/data/epg"
         sudo chown -R 501:501 "${SCRIPT_DIR}/downloads"
         sudo chown -R 501:501 "${SCRIPT_DIR}/data"
+        sudo chown -R 501:501 "${SCRIPT_DIR}/data/.ruvsarpur"
     fi
 fi
 
@@ -55,4 +59,5 @@ tree "${SCRIPT_DIR}/data" "${SCRIPT_DIR}/downloads"
 echo "Directory permissions:"
 ls -la "${SCRIPT_DIR}/data/epg"
 ls -la "${SCRIPT_DIR}/downloads"
-ls -la "${SCRIPT_DIR}/data" 
+ls -la "${SCRIPT_DIR}/data"
+ls -la "${SCRIPT_DIR}/data/.ruvsarpur" 

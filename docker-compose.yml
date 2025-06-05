@@ -32,4 +32,12 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:5000"]
       interval: 30s
       timeout: 10s
-      retries: 3 
+      retries: 3
+    # Add a command to ensure directory permissions are correct
+    command: >
+      bash -c "
+        mkdir -p /home/appuser/.ruvsarpur &&
+        chmod 777 /home/appuser/.ruvsarpur &&
+        chown appuser:appuser /home/appuser/.ruvsarpur &&
+        /app/entrypoint.sh
+      " 
