@@ -33,11 +33,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    # Add a command to ensure directory permissions are correct
+    # Add a command to ensure directory exists before starting
     command: >
       bash -c "
         mkdir -p /home/appuser/.ruvsarpur &&
-        chmod 777 /home/appuser/.ruvsarpur &&
-        chown appuser:appuser /home/appuser/.ruvsarpur &&
         /app/entrypoint.sh
       " 
