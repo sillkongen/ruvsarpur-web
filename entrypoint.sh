@@ -3,8 +3,29 @@
 echo "Starting RÚV Web UI..."
 echo "Running as user: $(whoami) (UID: $(id -u), GID: $(id -g))"
 
+# Debug: Check permissions of mounted volumes
+echo "Checking mounted volume permissions:"
+echo "=== /home/appuser/.ruvsarpur ==="
+ls -la /home/appuser/.ruvsarpur || echo "Directory does not exist"
+echo "=== /app/data/.ruvsarpur ==="
+ls -la /app/data/.ruvsarpur || echo "Directory does not exist"
+echo "=== /app/data ==="
+ls -la /app/data
+echo "=== /app/downloads ==="
+ls -la /app/downloads
+
 # Create necessary directories if they don't exist
-mkdir -p /app/data/.ruvsarpur /home/appuser/.ruvsarpur /app/backend/downloads
+echo "Creating necessary directories..."
+mkdir -p /home/appuser/.ruvsarpur || echo "Failed to create /home/appuser/.ruvsarpur"
+mkdir -p /app/data/.ruvsarpur || echo "Failed to create /app/data/.ruvsarpur"
+mkdir -p /app/backend/downloads || echo "Failed to create /app/backend/downloads"
+
+# Debug: Check permissions after directory creation
+echo "Checking permissions after directory creation:"
+echo "=== /home/appuser/.ruvsarpur ==="
+ls -la /home/appuser/.ruvsarpur || echo "Directory does not exist"
+echo "=== /app/data/.ruvsarpur ==="
+ls -la /app/data/.ruvsarpur || echo "Directory does not exist"
 
 # Function to refresh EPG data
 refresh_epg() {
@@ -40,19 +61,17 @@ else
     refresh_epg
 fi
 
-# Export PYTHONPATH to include backend directory
-export PYTHONPATH=/app:/app/backend:/app/ruvsarpur
+# Set PYTHONPATH
+export PYTHONPATH=/app:/app/ruvsarpur
 
-# Start both services directly
-# Start FastAPI backend
-cd /app
+# Start both services
 echo "Starting FastAPI backend..."
-python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8001 &
+python3 /app/backend/main.py &
+BACKEND_PID=$!
 
-# Wait a moment for backend to start
-sleep 2
-
-# Start Flask frontend
-cd /app
 echo "Starting Flask frontend..."
-exec python app.py 
+python3 /app/ruvsarpur/ruvsarpur.py &
+FRONTEND_PID=$!
+
+# Wait for either process to exit
+wait $BACKEND_PID $FRONTEND_PID 

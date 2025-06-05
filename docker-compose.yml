@@ -14,12 +14,21 @@ services:
       - "5000:5000"    # Flask frontend
       - "8001:8001"    # FastAPI backend
     volumes:
-      # EPG/Schedule data - use local directory
-      - ./data/epg:/home/appuser/.ruvsarpur
-      # Downloads directory - persist in host's downloads directory  
-      - ./downloads:/app/downloads
+      # EPG/Schedule data - use local directory with correct permissions
+      - type: bind
+        source: ./data/epg
+        target: /home/appuser/.ruvsarpur
+        consistency: delegated
+      # Downloads directory - persist in host's downloads directory
+      - type: bind
+        source: ./downloads
+        target: /app/downloads
+        consistency: delegated
       # Local data directory as fallback
-      - ./data:/app/data
+      - type: bind
+        source: ./data
+        target: /app/data
+        consistency: delegated
     environment:
       - PYTHONPATH=/app:/app/ruvsarpur
       - RUVSARPUR_PATH=/app/ruvsarpur
