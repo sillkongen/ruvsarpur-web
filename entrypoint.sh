@@ -12,7 +12,8 @@ chown -R appuser:appuser /app/data/.ruvsarpur /home/appuser/.ruvsarpur
 refresh_epg() {
     echo "Refreshing EPG data..."
     cd /app/ruvsarpur
-    su - appuser -c "cd /app/ruvsarpur && python3 ruvsarpur.py --refresh --list"
+    # Run directly as current user (should be appuser)
+    python3 ruvsarpur.py --refresh --list
     if [ $? -eq 0 ]; then
         cp /home/appuser/.ruvsarpur/tvschedule.json /app/data/.ruvsarpur/
         chown appuser:appuser /app/data/.ruvsarpur/tvschedule.json
@@ -41,16 +42,23 @@ else
     refresh_epg
 fi
 
-# Switch to appuser and start both services
-su - appuser << 'EOF'
+# Export PYTHONPATH to include backend directory
+export PYTHONPATH=/app:/app/backend:/app/ruvsarpur
+
+# Start both services directly (we're already running as appuser)
 # Start FastAPI backend
-cd /app/backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 &
+cd /app
+echo "Starting FastAPI backend..."
+echo "Current directory: $(pwd)"
+echo "Python path: $PYTHONPATH"
+echo "Listing backend directory:"
+ls -la /app/backend/app/
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8001 &
 
 # Wait a moment for backend to start
 sleep 2
 
 # Start Flask frontend
 cd /app
-exec python app.py
-EOF 
+echo "Starting Flask frontend..."
+exec python app.py 

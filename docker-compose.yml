@@ -14,7 +14,7 @@ services:
       # EPG/Schedule data - persist in host user's home directory, mounted to appuser in container
       - ${HOME}/.ruvsarpur:/home/appuser/.ruvsarpur
       # Downloads directory - persist in host's downloads directory  
-      - ./downloads:/app/backend/downloads
+      - ./downloads:/app/downloads/
       # Local data directory as fallback
       - ./data:/app/data
       # ruvsarpur is now included in the repository - no external mount needed
