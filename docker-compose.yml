@@ -14,9 +14,9 @@ services:
       - "5000:5000"    # Flask frontend
       - "8001:8001"    # FastAPI backend
     volumes:
-      # EPG/Schedule data - persist in host user's home directory, mounted to appuser in container
+      # EPG/Schedule data - use local directory
       - type: bind
-        source: ${HOME}/.ruvsarpur
+        source: ./data/epg
         target: /home/appuser/.ruvsarpur
       # Downloads directory - persist in host's downloads directory  
       - type: bind
