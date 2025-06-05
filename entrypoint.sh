@@ -3,39 +3,52 @@
 echo "Starting RÚV Web UI..."
 echo "Running as user: $(whoami) (UID: $(id -u), GID: $(id -g))"
 
+# Get host user and group IDs from environment variables
+HOST_UID=${HOST_UID:-1000}
+HOST_GID=${HOST_GID:-1000}
+echo "Host UID: $HOST_UID, Host GID: $HOST_GID"
+
+# Create necessary directories with proper permissions
+echo "Creating necessary directories..."
+mkdir -p /home/appuser/.ruvsarpur
+mkdir -p /app/data/.ruvsarpur
+mkdir -p /app/backend/downloads
+mkdir -p /app/downloads
+
+# Set permissions for all directories (world writable so any user can access)
+chmod -R 777 /home/appuser/.ruvsarpur
+chmod -R 777 /app/data/.ruvsarpur
+chmod -R 777 /app/backend/downloads
+chmod -R 777 /app/downloads
+
 # Debug: Check permissions of mounted volumes
 echo "Checking mounted volume permissions:"
 echo "=== /home/appuser/.ruvsarpur ==="
-ls -la /home/appuser/.ruvsarpur || echo "Directory does not exist"
+ls -la /home/appuser/.ruvsarpur
 echo "=== /app/data/.ruvsarpur ==="
-ls -la /app/data/.ruvsarpur || echo "Directory does not exist"
+ls -la /app/data/.ruvsarpur
 echo "=== /app/data ==="
 ls -la /app/data
 echo "=== /app/downloads ==="
 ls -la /app/downloads
 
-# Create necessary directories if they don't exist
-echo "Creating necessary directories..."
-mkdir -p /home/appuser/.ruvsarpur || echo "Failed to create /home/appuser/.ruvsarpur"
-mkdir -p /app/data/.ruvsarpur || echo "Failed to create /app/data/.ruvsarpur"
-mkdir -p /app/backend/downloads || echo "Failed to create /app/backend/downloads"
-
-# Debug: Check permissions after directory creation
-echo "Checking permissions after directory creation:"
-echo "=== /home/appuser/.ruvsarpur ==="
-ls -la /home/appuser/.ruvsarpur || echo "Directory does not exist"
-echo "=== /app/data/.ruvsarpur ==="
-ls -la /app/data/.ruvsarpur || echo "Directory does not exist"
-
 # Function to refresh EPG data
 refresh_epg() {
     echo "Refreshing EPG data..."
     cd /app/ruvsarpur
-    # Run directly as current user
     python3 ruvsarpur.py --refresh --list
     if [ $? -eq 0 ]; then
         # Copy the schedule file to the fallback location
         cp /home/appuser/.ruvsarpur/tvschedule.json /app/data/.ruvsarpur/ 2>/dev/null || true
+        
+        # Set ownership of created files to match host user
+        if [ -f /home/appuser/.ruvsarpur/tvschedule.json ]; then
+            chown $HOST_UID:$HOST_GID /home/appuser/.ruvsarpur/tvschedule.json 2>/dev/null || true
+        fi
+        if [ -f /app/data/.ruvsarpur/tvschedule.json ]; then
+            chown $HOST_UID:$HOST_GID /app/data/.ruvsarpur/tvschedule.json 2>/dev/null || true
+        fi
+        
         echo "✅ EPG data refreshed successfully!"
     else
         echo "❌ Failed to refresh EPG data"

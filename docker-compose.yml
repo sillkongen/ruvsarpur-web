@@ -4,12 +4,8 @@ services:
   ruvsarpur-web:
     build: 
       context: .
-      args:
-        - USER_ID=501
-        - GROUP_ID=501
     image: sillkongen/ruvsarpur-web:latest
     container_name: ruvsarpur-web
-    user: "501:501"  # Run as the host user
     ports:
       - "5000:5000"    # Flask frontend
       - "8001:8001"    # FastAPI backend
@@ -36,6 +32,9 @@ services:
       # EPG data locations in order of preference
       - SCHEDULE_FILE=/home/appuser/.ruvsarpur/tvschedule.json
       - SCHEDULE_FILE_FALLBACK=/app/data/.ruvsarpur/tvschedule.json
+      # Host user ID and group ID for file ownership
+      - HOST_UID=${HOST_UID:-1000}
+      - HOST_GID=${HOST_GID:-1000}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000"]
