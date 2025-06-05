@@ -75,15 +75,20 @@ else
 fi
 
 # Set PYTHONPATH
-export PYTHONPATH=/app:/app/ruvsarpur
+export PYTHONPATH=/app:/app/ruvsarpur:/app/backend
 
 # Start both services
 echo "Starting FastAPI backend..."
-python3 /app/backend/main.py &
+cd /app
+python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8001 &
 BACKEND_PID=$!
 
+# Wait a moment for backend to start
+sleep 3
+
 echo "Starting Flask frontend..."
-python3 /app/ruvsarpur/ruvsarpur.py &
+cd /app
+python3 app.py &
 FRONTEND_PID=$!
 
 # Wait for either process to exit
