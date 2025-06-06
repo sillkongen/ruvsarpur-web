@@ -30,7 +30,7 @@ A modern web interface for downloading shows from RÚV Sarpurinn with instant se
 1. **Clone this repository:**
    ```bash
    git clone https://github.com/sillkongen/ruvsarpur-web.git
-   cd ruvsarpur-web
+   cd ruvsarpur-web && sudo ./prestart.sh
    ```
 
 2. **Start the application:**
