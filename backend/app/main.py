@@ -14,6 +14,10 @@ from pydantic import BaseModel, field_validator
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# EPG refresh interval (5 minutes for testing, change to 2 hours for production)
+# show 5 minutes example: EPG_REFRESH_INTERVAL = 5 * 60  # 5 minutes
+EPG_REFRESH_INTERVAL = 2 * 60 * 60  # 2 hours
+
 # Get ruvsarpur paths from environment
 RUVSARPUR_PATH = os.environ.get('RUVSARPUR_PATH', '/app/ruvsarpur')
 RUVSARPUR_SCRIPT = os.environ.get('RUVSARPUR_SCRIPT', os.path.join(RUVSARPUR_PATH, 'ruvsarpur.py'))
@@ -71,6 +75,64 @@ app = FastAPI(title="RÚV Downloader API")
 
 # Load schedule on startup
 load_schedule()
+
+async def scheduled_epg_refresh():
+    """Background task that refreshes EPG data every 2 hours"""
+    while True:
+        try:
+            await asyncio.sleep(EPG_REFRESH_INTERVAL)
+            logger.info("Starting scheduled EPG refresh")
+            
+            # Check if EPG data needs refreshing
+            epg_locations = [
+                "/home/appuser/.ruvsarpur/tvschedule.json",
+                "/app/data/.ruvsarpur/tvschedule.json",
+                "/root/.ruvsarpur/tvschedule.json",
+                "/app/.ruvsarpur/tvschedule.json"
+            ]
+            
+            epg_file = None
+            for location in epg_locations:
+                if os.path.exists(location):
+                    epg_file = location
+                    break
+            
+            should_refresh = False
+            if epg_file:
+                # Check file age
+                import time
+                file_age_seconds = time.time() - os.path.getmtime(epg_file)
+                file_age_hours = file_age_seconds / 3600
+                logger.info(f"EPG data is {file_age_hours:.1f} hours old")
+                
+                # Refresh if older than 5 minutes (for testing)
+                file_age_minutes = file_age_seconds / 60
+                if file_age_minutes > 5:
+                    should_refresh = True
+                    logger.info(f"EPG data is more than 5 minutes old ({file_age_minutes:.1f} min), refreshing...")
+                else:
+                    logger.info("EPG data is still fresh, skipping refresh")
+            else:
+                should_refresh = True
+                logger.info("No EPG data found, triggering refresh")
+            
+            if should_refresh:
+                # Call the existing EPG refresh function
+                result = await download_epg()
+                if result.get("status") == "success":
+                    logger.info(f"Scheduled EPG refresh completed successfully. Items: {result.get('schedule_items', 0)}")
+                else:
+                    logger.error(f"Scheduled EPG refresh failed: {result.get('message', 'Unknown error')}")
+            
+        except Exception as e:
+            logger.error(f"Error in scheduled EPG refresh: {str(e)}", exc_info=True)
+            # Continue the loop even if there's an error
+
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks when the app starts"""
+    logger.info("Starting EPG refresh background task")
+    asyncio.create_task(scheduled_epg_refresh())
 
 # Global dictionary to track download status
 download_status: Dict[str, Dict] = {}
@@ -396,8 +458,8 @@ async def download_epg():
         # Create EPG directory in appuser's home (mounted from host)
         os.makedirs("/home/appuser/.ruvsarpur", exist_ok=True)
         
-        # Run ruvsarpur with a simple command to trigger EPG download
-        cmd = [python_executable, RUVSARPUR_SCRIPT, "--find", "test", "--limit", "1"]
+        # Run ruvsarpur with --refresh flag to explicitly refresh EPG data
+        cmd = [python_executable, RUVSARPUR_SCRIPT, "--refresh", "--list"]
         
         logger.info(f"Triggering EPG download with command: {' '.join(cmd)}")
         

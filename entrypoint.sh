@@ -58,13 +58,15 @@ refresh_epg() {
 
 # Check if EPG data exists and its age
 if [ -f /home/appuser/.ruvsarpur/tvschedule.json ]; then
-    # Get file age in hours
-    file_age_hours=$(( ($(date +%s) - $(stat -c %Y /home/appuser/.ruvsarpur/tvschedule.json)) / 3600 ))
-    echo "EPG data is ${file_age_hours} hours old"
+    # Get file age in seconds and convert to hours/minutes
+    file_age_seconds=$(( $(date +%s) - $(stat -c %Y /home/appuser/.ruvsarpur/tvschedule.json) ))
+    file_age_hours=$(( file_age_seconds / 3600 ))
+    file_age_minutes=$(( file_age_seconds / 60 ))
+    echo "EPG data is ${file_age_hours} hours old (${file_age_minutes} minutes)"
     
-    # Refresh if older than 4 hours
-    if [ $file_age_hours -gt 4 ]; then
-        echo "EPG data is more than 4 hours old, refreshing..."
+    # Refresh if older than 5 minutes (for testing - change to 2 hours for production)
+    if [ $file_age_minutes -gt 5 ]; then
+        echo "EPG data is more than 5 minutes old (${file_age_minutes} min), refreshing..."
         refresh_epg
     else
         echo "EPG data is recent enough, proceeding with startup..."
