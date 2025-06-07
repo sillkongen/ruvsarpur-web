@@ -64,9 +64,9 @@ if [ -f /home/appuser/.ruvsarpur/tvschedule.json ]; then
     file_age_minutes=$(( file_age_seconds / 60 ))
     echo "EPG data is ${file_age_hours} hours old (${file_age_minutes} minutes)"
     
-    # Refresh if older than 5 minutes (for testing - change to 2 hours for production)
-    if [ $file_age_minutes -gt 5 ]; then
-        echo "EPG data is more than 5 minutes old (${file_age_minutes} min), refreshing..."
+    # Refresh if older than 2 hours (120 minutes)
+    if [ $file_age_minutes -gt 120 ]; then
+        echo "EPG data is more than 2 hours old (${file_age_minutes} min), refreshing..."
         refresh_epg
     else
         echo "EPG data is recent enough, proceeding with startup..."

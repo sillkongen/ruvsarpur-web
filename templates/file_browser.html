@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Downloaded Files - RÚV Sarpurinn</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-color: #212529;
+            --text-muted: #6c757d;
+            --border-color: #dee2e6;
+            --list-item-bg: #ffffff;
+            --list-item-hover: #f8f9fa;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #212529;
+            --bg-secondary: #343a40;
+            --text-color: #ffffff;
+            --text-muted: #adb5bd;
+            --border-color: #495057;
+            --list-item-bg: #343a40;
+            --list-item-hover: #495057;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .list-group-item {
+            background-color: var(--list-item-bg);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .list-group-item:hover {
+            background-color: var(--list-item-hover);
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        .file-path {
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 0.85em;
+            background: var(--bg-secondary);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            border: none;
+            background: var(--bg-secondary);
+            color: var(--text-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .file-icon {
+            margin-right: 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        .file-size {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .no-files {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb {
+            background-color: var(--bg-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .breadcrumb-item a {
+            color: var(--text-color);
+            text-decoration: none;
+        }
+
+        .breadcrumb-item a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <!-- Dark Mode Toggle -->
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+        <span id="themeIcon">🌙</span>
+    </button>
+
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Downloaded Files</h1>
+            <a href="/" class="btn btn-outline-primary">
+                ← Back to Search
+            </a>
+        </div>
+
+        <!-- File Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">📁 Total Files</h5>
+                        <h3 class="text-primary">{{ files|length }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">💾 Total Size</h5>
+                        <h3 class="text-success">{{ total_size_gb }} GB</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">📍 Location</h5>
+                        <small class="file-path">{{ directory }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- File List -->
+        {% if files %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Files Available for Download</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for file in files %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center">
+                            <span class="file-icon">
+                                {% if file.name.endswith('.mp4') %}🎬
+                                {% elif file.name.endswith('.mkv') %}🎥
+                                {% elif file.name.endswith('.avi') %}📹
+                                {% elif file.name.endswith('.srt') %}📝
+                                {% else %}📄
+                                {% endif %}
+                            </span>
+                            <div>
+                                <h6 class="mb-1">{{ file.name }}</h6>
+                                {% if file.path != file.name %}
+                                <small class="file-path">{{ file.path }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="file-size">{{ file.size_mb }} MB</span>
+                        <a href="/download/{{ file.path }}" class="btn btn-primary btn-sm" download>
+                            ⬇️ Download
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="no-files">
+            <h3>📂 No Files Found</h3>
+            <p>No downloaded files available yet. Start by <a href="/">searching and downloading</a> some shows!</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Dark mode toggle functionality
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const currentTheme = localStorage.getItem('theme') || 'light';
+
+        // Set initial theme
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        themeIcon.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        });
+    </script>
+</body>
+</html> 

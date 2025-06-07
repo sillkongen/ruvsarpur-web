@@ -8,15 +8,15 @@ from pathlib import Path
 from typing import Optional, Dict, List
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# EPG refresh interval (5 minutes for testing, change to 2 hours for production)
-# show 5 minutes example: EPG_REFRESH_INTERVAL = 5 * 60  # 5 minutes
-EPG_REFRESH_INTERVAL = 2 * 60 * 60  # 2 hours
+# EPG refresh interval (2 hours in seconds)
+EPG_REFRESH_INTERVAL = 2 * 60 * 60  # 2 hours = 7200 seconds
 
 # Get ruvsarpur paths from environment
 RUVSARPUR_PATH = os.environ.get('RUVSARPUR_PATH', '/app/ruvsarpur')
@@ -27,7 +27,7 @@ SCHEDULE_FILE = os.environ.get('SCHEDULE_FILE', "/home/appuser/.ruvsarpur/tvsche
 SCHEDULE_FILE_FALLBACK = os.environ.get('SCHEDULE_FILE_FALLBACK', "/app/data/.ruvsarpur/tvschedule.json")
 
 # Default download directory
-DEFAULT_DOWNLOAD_DIR = "/app/backend/downloads"
+DEFAULT_DOWNLOAD_DIR = "/app/downloads"
 
 # Verify the script exists
 if not os.path.exists(RUVSARPUR_SCRIPT):
@@ -73,6 +73,9 @@ def load_schedule():
 
 app = FastAPI(title="RÚV Downloader API")
 
+# Mount static files for download access
+app.mount("/download", StaticFiles(directory="/app/downloads"), name="downloads")
+
 # Load schedule on startup
 load_schedule()
 
@@ -105,11 +108,11 @@ async def scheduled_epg_refresh():
                 file_age_hours = file_age_seconds / 3600
                 logger.info(f"EPG data is {file_age_hours:.1f} hours old")
                 
-                # Refresh if older than 5 minutes (for testing)
+                # Refresh if older than 2 hours (120 minutes)
                 file_age_minutes = file_age_seconds / 60
-                if file_age_minutes > 5:
+                if file_age_minutes > 120:
                     should_refresh = True
-                    logger.info(f"EPG data is more than 5 minutes old ({file_age_minutes:.1f} min), refreshing...")
+                    logger.info(f"EPG data is more than 2 hours old ({file_age_minutes:.1f} min), refreshing...")
                 else:
                     logger.info("EPG data is still fresh, skipping refresh")
             else:

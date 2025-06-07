@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory, abort
 import requests
 from database import init_db, add_download, update_download_status, get_downloads
 import os
@@ -8,8 +8,8 @@ app = Flask(__name__)
 
 BACKEND_URL = "http://localhost:8001"  # FastAPI backend URL
 
-# Default download directory (absolute path for container)
-DEFAULT_DOWNLOAD_DIR = "/app/backend/downloads"
+# Default download directory (fixed to match Docker volume mount)
+DEFAULT_DOWNLOAD_DIR = "/app/downloads"
 
 @app.route('/')
 def index():
@@ -126,6 +126,55 @@ def check_status(pid):
 def get_download_history():
     downloads = get_downloads()
     return jsonify([dict(d) for d in downloads])
+
+# Add download file serving routes
+@app.route('/download/')
+@app.route('/download/<path:filename>')
+def download_files(filename=None):
+    """Serve downloaded files and provide directory listing"""
+    try:
+        if filename is None:
+            # Show directory listing as HTML
+            if not os.path.exists(DEFAULT_DOWNLOAD_DIR):
+                return render_template('file_browser.html', 
+                                     files=[], 
+                                     directory=DEFAULT_DOWNLOAD_DIR,
+                                     total_size_gb=0)
+            
+            files = []
+            total_size_bytes = 0
+            for root, dirs, filenames in os.walk(DEFAULT_DOWNLOAD_DIR):
+                for file in filenames:
+                    rel_path = os.path.relpath(os.path.join(root, file), DEFAULT_DOWNLOAD_DIR)
+                    file_size = os.path.getsize(os.path.join(root, file))
+                    total_size_bytes += file_size
+                    files.append({
+                        'name': file,
+                        'path': rel_path,
+                        'size': file_size,
+                        'size_mb': round(file_size / (1024 * 1024), 2)
+                    })
+            
+            # Sort files by name
+            files.sort(key=lambda x: x['name'].lower())
+            
+            # Calculate total size in GB
+            total_size_gb = round(total_size_bytes / (1024 * 1024 * 1024), 2)
+            
+            return render_template('file_browser.html', 
+                                 files=files, 
+                                 directory=DEFAULT_DOWNLOAD_DIR,
+                                 total_size_gb=total_size_gb)
+        else:
+            # Serve specific file
+            file_path = os.path.join(DEFAULT_DOWNLOAD_DIR, filename)
+            if not os.path.exists(file_path):
+                abort(404)
+            
+            return send_from_directory(DEFAULT_DOWNLOAD_DIR, filename, as_attachment=True)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     init_db()  # Initialize the database on startup
