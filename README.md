@@ -90,7 +90,8 @@ ctually an important file that should typically be included in version control, 
 
 ## Todo
 
-1. Proper non root user setup within container
+1. File management, delete from Download section
+2. Proper non root user setup within container
 
 
 ## License
