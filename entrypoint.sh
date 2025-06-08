@@ -36,6 +36,11 @@ ls -la /app/downloads
 refresh_epg() {
     echo "Refreshing EPG data..."
     cd /app/ruvsarpur
+    
+    # Set HOME environment to ensure ruvsarpur writes to the correct location
+    export HOME=/home/appuser
+    echo "HOME is set to: $HOME"
+    
     python3 ruvsarpur.py --refresh --list
     if [ $? -eq 0 ]; then
         # Copy the schedule file to the fallback location

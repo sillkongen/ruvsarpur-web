@@ -171,7 +171,21 @@ def download_files(filename=None):
             if not os.path.exists(file_path):
                 abort(404)
             
-            return send_from_directory(DEFAULT_DOWNLOAD_DIR, filename, as_attachment=True)
+            # Set proper MIME type for video files so browsers offer VLC as option
+            mimetype = None
+            if filename.lower().endswith('.mp4'):
+                mimetype = 'video/mp4'
+            elif filename.lower().endswith('.mkv'):
+                mimetype = 'video/x-matroska'
+            elif filename.lower().endswith('.avi'):
+                mimetype = 'video/x-msvideo'
+            elif filename.lower().endswith(('.mov', '.m4v')):
+                mimetype = 'video/quicktime'
+            elif filename.lower().endswith('.webm'):
+                mimetype = 'video/webm'
+            
+            return send_from_directory(DEFAULT_DOWNLOAD_DIR, filename, 
+                                     as_attachment=True, mimetype=mimetype)
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
