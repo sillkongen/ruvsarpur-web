@@ -936,30 +936,37 @@ RE_CAPTURE_VOD_EPNUM_FROM_TITLE = re.compile(r'(?P<ep_num>\d+) af (?P<ep_total>\
 # Downloads the full front page VOD schedule and for each episode in there fetches all available episodes
 # uses the new RUV GraphQL queries
 def getVodSchedule(existing_schedule, args_incremental_refresh=False, imdb_cache=None, imdb_orignal_titles=None):
-  # Start with getting all the series available on RUV through their API
-  ruv_api_url_all = 'https://api.ruv.is/api/programs/featured/tv'
-  r = __create_retry_session().get(ruv_api_url_all)  
-  api_data = r.json()
+  # Fetch all categories to get the full program catalog (~2000+ programs across 14 categories)
+  ruv_api_url_categories = 'https://api.ruv.is/api/programs/categories/tv'
+  r_cat = __create_retry_session().get(ruv_api_url_categories)
 
-  # Now the api returns everything categorised into panels
-  all_panel_data= api_data['panels'] if 'panels' in api_data else None
-
-  data = []
-  # Combine all 
-  for panel_data in all_panel_data:
-    if 'programs' in panel_data:
-      data.extend(panel_data['programs'])
-
-  # Remove all duplicate series from the list
-  data = list({item['id']:item for item in data}.values())
-
-  schedule = {}  
+  schedule = {}
 
   # If we are dealing with incremental refresh then start by storing our existing schedule
   if args_incremental_refresh:
     schedule = existing_schedule
 
-  if r.status_code != 200  or data is None or len(data) < 1:
+  if r_cat.status_code != 200:
+    return schedule
+
+  categories = r_cat.json().get('categories', [])
+
+  data = []
+  for category in categories:
+    cat_url = category.get('_self')
+    if not cat_url:
+      continue
+    r = __create_retry_session().get(cat_url)
+    if r.status_code != 200:
+      continue
+    cat_data = r.json()
+    if 'programs' in cat_data:
+      data.extend(cat_data['programs'])
+
+  # Remove all duplicate series from the list
+  data = list({item['id']:item for item in data}.values())
+
+  if data is None or len(data) < 1:
     return schedule
   
   if not data or len(data) <=0:
@@ -1485,17 +1492,23 @@ def runMain():
       #############################################
       # First download the URL for the listing if needed
       if not 'file' in item or item['file'] is None or len(item['file']) < 1 or not str(item['file']).startswith(RUV_URL):
-        ep_graphdata = '?operationName=getProgramType&variables={"id":'+str(item['sid'])+',"episodeId":["'+str(item['pid'])+'"]}&extensions={"persistedQuery":{"version":1,"sha256Hash":"9d18a07f82fcd469ad52c0656f47fb8e711dc2436983b53754e0c09bad61ca29"}}'
-        data = requestsVodDataRetrieveWithRetries(ep_graphdata)     
-        if data is None or len(data) < 1:
+        # Use the REST API to look up the episode file URL (replaces broken GraphQL persisted query)
+        ep_rest_url = 'https://api.ruv.is/api/programs/program/{0}/all'.format(item['sid'])
+        ep_rest_r = __create_retry_session().get(ep_rest_url)
+        ep_data = None
+        if ep_rest_r.status_code == 200:
+          ep_rest_data = ep_rest_r.json()
+          for ep in ep_rest_data.get('episodes', []):
+            if str(ep.get('id')) == str(item['pid']):
+              ep_data = ep
+              break
+        if ep_data is None:
           print("Error: Could not retrieve episode download url, unable to download VOD details, skipping "+item['title'])
           continue
-        
-        if not data or not 'data' in data or not 'Program' in data['data'] or not 'episodes' in data['data']['Program'] or len(data['data']['Program']['episodes']) < 1:
+        if not ep_data.get('file'):
           print("Error: Could not retrieve episode download url, VOD did not return any data, skipping "+item['title'])
           continue
 
-        ep_data = data['data']['Program']['episodes'][0] # First and only item
         vod_url_full = ep_data['file']
       else:
         vod_url_full = item['file']
