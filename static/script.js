@@ -130,10 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Don't search if less than 2 characters
         if (query.length < 2) {
             resultsDiv.innerHTML = `
-                <div class="text-center text-muted my-4">
-                    Type at least 2 characters to search...
-                </div>
-            `;
+                <div class="search-hint">
+                    <i class="bi bi-tv"></i>
+                    Type at least 2 characters to search…
+                </div>`;
             loadingDiv.classList.add('d-none');
             return;
         }
@@ -162,44 +162,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 300);
     });
 
+    function thumbUrl(url) {
+        if (!url) return null;
+        return url.replace('/2048x/', '/300x/').replace('/480x/', '/300x/');
+    }
+
     function displayResults(results) {
         resultsDiv.innerHTML = '';
-        console.log('Displaying results:', results); // Debug log
-        
+
         if (!Array.isArray(results) || results.length === 0) {
             resultsDiv.innerHTML = `
-                <div class="text-center text-muted my-4">
+                <div class="search-hint">
+                    <i class="bi bi-search"></i>
                     No results found. Try a different search term.
-                </div>
-            `;
+                </div>`;
             return;
         }
 
         results.forEach(result => {
-            // Handle the specific format from ruvsarpur API
             const title = result.title || result.name || 'Untitled';
             const description = result.description || result.desc || '';
             const id = result.pid || result.id || '';
-            const episodeInfo = result.episode_number ? 
-                `Episode ${result.episode_number}${result.series_title ? ` - ${result.series_title}` : ''}` : '';
+            const safeTitle = title.replace(/'/g, "\\'");
+            const img = thumbUrl(result.image);
+
+            const thumb = img
+                ? `<img src="${img}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'result-thumb-placeholder\\'><i class=\\'bi bi-film\\'></i></div>'">`
+                : `<div class="result-thumb-placeholder"><i class="bi bi-film"></i></div>`;
+
+            const seriesLine = (result.series_title && result.series_title !== title)
+                ? `<div class="result-series">${result.series_title}${result.episode_info ? ' · ' + result.episode_info : ''}</div>`
+                : (result.episode_info ? `<div class="result-series">${result.episode_info}</div>` : '');
+
+            const badges = [
+                result.is_movie   ? `<span class="badge-pill accent"><i class="bi bi-film"></i> Movie</span>` : '',
+                result.is_docu    ? `<span class="badge-pill accent"><i class="bi bi-camera-reels"></i> Documentary</span>` : '',
+                result.is_sport   ? `<span class="badge-pill accent"><i class="bi bi-trophy"></i> Sport</span>` : '',
+                result.has_subtitles ? `<span class="badge-pill success"><i class="bi bi-badge-cc"></i> Subtitles</span>` : '',
+                result.duration   ? `<span class="badge-pill"><i class="bi bi-clock"></i> ${result.duration}</span>` : '',
+            ].filter(Boolean).join('');
 
             const item = document.createElement('div');
-            item.className = 'list-group-item d-flex justify-content-between align-items-center';
+            item.className = 'result-card';
             item.innerHTML = `
-                <div class="flex-grow-1">
-                    <h6 class="mb-1">${title}</h6>
-                    ${episodeInfo ? `<small class="text-primary fw-semibold">${episodeInfo}</small><br>` : ''}
-                    <p class="mb-1 text-muted">${description}</p>
-                    ${result.duration ? `<small class="text-muted">Duration: ${result.duration}</small>` : ''}
+                <div class="result-thumb">${thumb}</div>
+                <div class="result-body">
+                    <div class="result-title">${title}</div>
+                    ${seriesLine}
+                    ${description ? `<div class="result-desc">${description}</div>` : ''}
+                    <div class="result-meta">${badges}</div>
                 </div>
-                <div class="ms-3">
-                    <button class="btn btn-primary btn-download" 
-                            onclick="downloadShow('${id}', '${title.replace(/'/g, "\\'")}', this)"
+                <div class="result-actions">
+                    <button class="btn-download"
+                            onclick="downloadShow('${id}', '${safeTitle}', this)"
                             data-pid="${id}">
-                        Download
+                        <i class="bi bi-download me-1"></i>Download
                     </button>
-                </div>
-            `;
+                </div>`;
             resultsDiv.appendChild(item);
         });
     }
@@ -214,8 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             window.activeDownloads.add(pid);
             
-            // Update button to show "Starting..."
-            buttonElement.innerHTML = '<span class="download-status status-started">⏳ Starting...</span>';
+            buttonElement.innerHTML = '<span class="dl-status dl-started"><i class="bi bi-hourglass-split"></i> Starting…</span>';
             buttonElement.disabled = true;
 
             const response = await fetch('/download', {
@@ -236,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok) {
                 console.log(`Download started for ${pid}`);
-                buttonElement.innerHTML = '<span class="download-status status-started">📥 Downloading...</span>';
+                buttonElement.innerHTML = '<span class="dl-status dl-progress"><i class="bi bi-arrow-down-circle"></i> Downloading…</span>';
                 
                 // Start polling for status
                 checkDownloadStatus(pid, buttonElement);
@@ -245,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Download error:', error);
-            buttonElement.innerHTML = '<span class="download-status status-failed">❌ Failed</span>';
+            buttonElement.innerHTML = '<span class="dl-status dl-failed"><i class="bi bi-x-circle-fill"></i> Failed</span>';
             buttonElement.disabled = false;
             window.activeDownloads.delete(pid);
             showError(`Download failed: ${error.message}`);
@@ -265,11 +283,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const status = result.status;
                 
                 if (status === 'completed') {
-                    buttonElement.innerHTML = '<span class="download-status status-completed"><span class="checkmark">✓</span> Downloaded</span>';
+                    buttonElement.innerHTML = '<span class="dl-status dl-done"><i class="bi bi-check-circle-fill"></i> Downloaded</span>';
                     window.activeDownloads.delete(pid);
                     return; // Stop polling when completed
                 } else if (status === 'failed') {
-                    buttonElement.innerHTML = '<span class="download-status status-failed">❌ Failed</span>';
+                    buttonElement.innerHTML = '<span class="dl-status dl-failed"><i class="bi bi-x-circle-fill"></i> Failed</span>';
                     buttonElement.disabled = false;
                     window.activeDownloads.delete(pid);
                     return; // Stop polling when failed
@@ -281,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error(`Status check failed for ${pid}:`, result.error);
                 // If 404, the download might not exist anymore, stop polling
                 if (response.status === 404) {
-                    buttonElement.innerHTML = '<span class="download-status status-failed">❌ Not found</span>';
+                    buttonElement.innerHTML = '<span class="dl-status dl-failed"><i class="bi bi-x-circle-fill"></i> Not found</span>';
                     buttonElement.disabled = false;
                     window.activeDownloads.delete(pid);
                     return; // Stop polling when not found

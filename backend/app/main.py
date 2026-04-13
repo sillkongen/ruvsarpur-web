@@ -209,7 +209,7 @@ async def search_shows(query: str):
                         'title': item.get('title', ''),
                         'description': item.get('desc', ''),
                         'duration': item.get('duration_friendly', ''),
-                        'image': item.get('series_image') or item.get('episode_image') or '',
+                        'image': item.get('portrait_image') or item.get('series_image') or item.get('episode_image') or '',
                         'has_subtitles': item.get('has_subtitles', False),
                         'is_movie': item.get('is_movie', False),
                         'is_sport': item.get('is_sport', False),
