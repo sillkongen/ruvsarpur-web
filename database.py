@@ -61,10 +61,38 @@ def update_download_status(pid, status, file_path=None):
             ''', (status, pid))
         db.commit()
 
+def get_titles_for_pids(pids):
+    if not pids:
+        return {}
+    with get_db() as db:
+        placeholders = ','.join('?' for _ in pids)
+        rows = db.execute(f'''
+            SELECT pid, title FROM downloads
+            WHERE pid IN ({placeholders})
+            ORDER BY id DESC
+        ''', list(pids)).fetchall()
+    titles = {}
+    for row in rows:
+        titles.setdefault(row['pid'], row['title'])
+    return titles
+
 def get_downloads(limit=50):
     with get_db() as db:
         return db.execute('''
-            SELECT * FROM downloads 
-            ORDER BY created_at DESC 
+            SELECT * FROM downloads
+            ORDER BY created_at DESC
             LIMIT ?
-        ''', (limit,)).fetchall() 
+        ''', (limit,)).fetchall()
+
+def delete_download(download_id):
+    with get_db() as db:
+        db.execute('DELETE FROM downloads WHERE id = ?', (download_id,))
+        db.commit()
+
+def clear_downloads(status=None):
+    with get_db() as db:
+        if status:
+            db.execute('DELETE FROM downloads WHERE status = ?', (status,))
+        else:
+            db.execute('DELETE FROM downloads')
+        db.commit()
