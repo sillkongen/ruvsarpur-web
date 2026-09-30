@@ -143,6 +143,59 @@
             min-width: 80px;
             text-align: right;
         }
+
+        /* Bootstrap components don't know about our custom [data-theme] attribute
+           (it's not Bootstrap's own data-bs-theme), so they stay light unless overridden */
+        [data-theme="dark"] .card {
+            background-color: var(--bg-secondary);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        [data-theme="dark"] .card-header {
+            background-color: var(--list-item-bg);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        [data-theme="dark"] .alert-info {
+            background-color: var(--bg-secondary);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        [data-theme="dark"] .dropdown-menu {
+            background-color: var(--list-item-bg);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] .dropdown-item {
+            color: var(--text-color);
+        }
+
+        [data-theme="dark"] .dropdown-item:hover,
+        [data-theme="dark"] .dropdown-item:focus {
+            background-color: var(--list-item-hover);
+            color: var(--text-color);
+        }
+
+        [data-theme="dark"] .dropdown-divider {
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] .progress {
+            background-color: var(--bg-color);
+        }
+
+        [data-theme="dark"] .btn-outline-secondary {
+            color: var(--text-muted);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] .btn-outline-secondary:hover {
+            background-color: var(--list-item-hover);
+            color: var(--text-color);
+        }
     </style>
 </head>
 <body>
