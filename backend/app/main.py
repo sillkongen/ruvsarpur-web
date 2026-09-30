@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import logging
@@ -167,6 +168,24 @@ class DownloadRequest(BaseModel):
         # Ensure we always have an absolute path
         return os.path.abspath(value)
 
+class DownloadSeriesRequest(BaseModel):
+    sid: str
+    quality: str = "HD1080"
+    output_dir: str = DEFAULT_DOWNLOAD_DIR  # Use the default download directory
+
+    @field_validator('sid')
+    @classmethod
+    def strip_sid_whitespace(cls, value: str) -> str:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    @field_validator('output_dir')
+    @classmethod
+    def ensure_absolute_path(cls, value: str) -> str:
+        # Ensure we always have an absolute path
+        return os.path.abspath(value)
+
 @app.get("/api/search/{query}")
 async def search_shows(query: str):
     """Search for shows in the loaded schedule data"""
@@ -263,6 +282,86 @@ async def refresh_schedule():
         logger.error(f"Refresh error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ruvsarpur prints its progress bar using carriage returns (no newline) and ANSI color
+# codes, e.g. "\r Downloading: |===---| 45.3% Working" and "1 of 6: Title | Estimated: 120 MB"
+ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
+PERCENT_RE = re.compile(r'(\d+(?:\.\d+)?)\s*%')
+EPISODE_PROGRESS_RE = re.compile(r'^(?P<curr>\d+) of (?P<total>\d+): (?P<title>.+?) \| Estimated: \d+ MB$')
+
+async def _stream_download_progress(process, status_key: str) -> str:
+    """Reads the subprocess stdout as it arrives (rather than waiting for completion)
+    and updates download_status[status_key] with live progress as it's parsed."""
+    buffer = b''
+    lines = []
+    while True:
+        chunk = await process.stdout.read(4096)
+        if not chunk:
+            break
+        buffer += chunk
+        # ruvsarpur uses bare \r to update its progress bar in place, so split on both
+        *segments, buffer = re.split(rb'[\r\n]', buffer)
+        for raw_segment in segments:
+            line = ANSI_ESCAPE_RE.sub('', raw_segment.decode('utf-8', errors='replace')).strip()
+            if not line:
+                continue
+            lines.append(line)
+
+            episode_match = EPISODE_PROGRESS_RE.match(line)
+            if episode_match:
+                download_status[status_key] = {
+                    **download_status.get(status_key, {}),
+                    "status": "downloading",
+                    "current_episode": int(episode_match.group('curr')),
+                    "total_episodes": int(episode_match.group('total')),
+                    "current_title": episode_match.group('title'),
+                    "percent": 0.0,
+                }
+                continue
+
+            if 'Downloading:' in line:
+                percent_match = PERCENT_RE.search(line)
+                if percent_match:
+                    download_status[status_key] = {
+                        **download_status.get(status_key, {}),
+                        "status": "downloading",
+                        "percent": float(percent_match.group(1)),
+                    }
+
+    if buffer:
+        line = ANSI_ESCAPE_RE.sub('', buffer.decode('utf-8', errors='replace')).strip()
+        if line:
+            lines.append(line)
+
+    return '\n'.join(lines)
+
+async def _run_download_process(cmd: List[str], env: Dict[str, str], status_key: str, timeout: int):
+    """Runs the ruvsarpur subprocess, streaming stdout for live progress while it runs.
+    Returns (returncode, stdout_text, stderr_text), or None if the process timed out."""
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=RUVSARPUR_PATH,
+        env=env
+    )
+
+    try:
+        stdout_text, stderr_bytes = await asyncio.wait_for(
+            asyncio.gather(
+                _stream_download_progress(process, status_key),
+                process.stderr.read()
+            ),
+            timeout=timeout
+        )
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.wait()
+        return None
+
+    await process.wait()
+    stderr_text = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ''
+    return process.returncode, stdout_text, stderr_text
+
 async def download_show_task(pid: str, quality: str, output_dir: str):
     """Background task to handle show download using ruvsarpur script"""
     try:
@@ -318,35 +417,23 @@ async def download_show_task(pid: str, quality: str, output_dir: str):
         env = os.environ.copy()
         env['HOME'] = '/home/appuser'  # Ensure ruvsarpur looks for EPG data in the correct appuser location
         
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=RUVSARPUR_PATH,
-            env=env
-        )
-        
-        # Add timeout to prevent hanging indefinitely (30 minutes max)
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(), 
-                timeout=1800  # 30 minutes timeout
-            )
-        except asyncio.TimeoutError:
+        # Add timeout to prevent hanging indefinitely (30 minutes max), streaming
+        # stdout live so download_status is updated with progress as it happens
+        result = await _run_download_process(cmd, env, pid, timeout=1800)
+        if result is None:
             logger.error(f"Download timed out for PID {pid} after 30 minutes")
-            process.kill()
-            await process.wait()
             download_status[pid] = {
                 "status": "failed",
                 "error": "Download timed out after 30 minutes"
             }
             return
-        
-        logger.info(f"Download process completed with return code: {process.returncode}")
-        logger.info(f"STDOUT: {stdout.decode('utf-8') if stdout else 'No stdout'}")
-        logger.info(f"STDERR: {stderr.decode('utf-8') if stderr else 'No stderr'}")
-        
-        if process.returncode == 0:
+
+        returncode, stdout, stderr = result
+        logger.info(f"Download process completed with return code: {returncode}")
+        logger.info(f"STDOUT: {stdout if stdout else 'No stdout'}")
+        logger.info(f"STDERR: {stderr if stderr else 'No stderr'}")
+
+        if returncode == 0:
             logger.info(f"Download completed successfully for PID: {pid}")
             download_status[pid] = {
                 "status": "completed",
@@ -354,13 +441,13 @@ async def download_show_task(pid: str, quality: str, output_dir: str):
                 "message": "Download completed successfully"
             }
         else:
-            error_msg = stderr.decode('utf-8') if stderr else f"Process failed with return code {process.returncode}"
+            error_msg = stderr if stderr else f"Process failed with return code {returncode}"
             logger.error(f"Download failed for PID {pid}: {error_msg}")
             download_status[pid] = {
                 "status": "failed",
                 "error": error_msg
             }
-            
+
     except Exception as e:
         logger.error(f"Download error for {pid}: {str(e)}", exc_info=True)
         download_status[pid] = {"status": "failed", "error": str(e)}
@@ -395,6 +482,91 @@ async def download_show(request: DownloadRequest, background_tasks: BackgroundTa
         logger.error(f"Error in /api/download for PID '{request.pid if request and hasattr(request, 'pid') else 'unknown'}': {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+async def download_series_task(sid: str, quality: str, output_dir: str):
+    """Background task to download every available episode of a series using ruvsarpur script"""
+    status_key = f"series:{sid}"
+    try:
+        logger.info(f"Starting series download for SID: {sid}")
+        download_status[status_key] = {"status": "downloading", "file_path": None}
+
+        abs_output_dir = os.path.abspath(output_dir)
+        os.makedirs(abs_output_dir, exist_ok=True)
+
+        python_executable = os.path.join(os.path.dirname(sys.executable), "python3")
+        if not os.path.exists(python_executable):
+            python_executable = sys.executable
+
+        cmd = [python_executable, RUVSARPUR_SCRIPT, "--sid", sid, "--output", abs_output_dir]
+        if quality and quality != "HD1080":
+            cmd.extend(["--quality", quality])
+
+        logger.info(f"Running series download command: {' '.join(cmd)}")
+
+        env = os.environ.copy()
+        env['HOME'] = '/home/appuser'
+
+        # Series downloads can involve many episodes, so allow a much longer timeout (3 hours),
+        # streaming stdout live so download_status is updated with per-episode progress
+        result = await _run_download_process(cmd, env, status_key, timeout=10800)
+        if result is None:
+            logger.error(f"Series download timed out for SID {sid} after 3 hours")
+            download_status[status_key] = {
+                "status": "failed",
+                "error": "Series download timed out after 3 hours"
+            }
+            return
+
+        returncode, stdout, stderr = result
+        logger.info(f"Series download process completed with return code: {returncode}")
+        logger.info(f"STDOUT: {stdout if stdout else 'No stdout'}")
+        logger.info(f"STDERR: {stderr if stderr else 'No stderr'}")
+
+        if returncode == 0:
+            logger.info(f"Series download completed successfully for SID: {sid}")
+            download_status[status_key] = {
+                "status": "completed",
+                "file_path": abs_output_dir,
+                "message": "Series download completed successfully"
+            }
+        else:
+            error_msg = stderr if stderr else f"Process failed with return code {returncode}"
+            logger.error(f"Series download failed for SID {sid}: {error_msg}")
+            download_status[status_key] = {
+                "status": "failed",
+                "error": error_msg
+            }
+
+    except Exception as e:
+        logger.error(f"Series download error for {sid}: {str(e)}", exc_info=True)
+        download_status[status_key] = {"status": "failed", "error": str(e)}
+
+@app.post("/api/download-series")
+async def download_series(request: DownloadSeriesRequest, background_tasks: BackgroundTasks):
+    """Download every available episode of a series by its series ID"""
+    try:
+        logger.info(f"Received series download request for SID: '{request.sid}', Quality: {request.quality}, Output: {request.output_dir}")
+
+        status_key = f"series:{request.sid}"
+        os.makedirs(request.output_dir, exist_ok=True)
+        download_status[status_key] = {"status": "starting"}
+
+        background_tasks.add_task(
+            download_series_task,
+            request.sid,
+            request.quality,
+            request.output_dir
+        )
+
+        return {
+            "status": "started",
+            "sid": request.sid,
+            "status_key": status_key,
+            "message": "Series download started successfully"
+        }
+    except Exception as e:
+        logger.error(f"Error in /api/download-series for SID '{request.sid if request and hasattr(request, 'sid') else 'unknown'}': {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/status/{pid}")
 async def get_status(pid: str):
     """Get the status of a download"""
@@ -408,6 +580,15 @@ async def get_status(pid: str):
     
     logger.debug(f"PID '{stripped_pid}' found. Status: {download_status[stripped_pid]}")
     return download_status[stripped_pid]
+
+@app.get("/api/downloads/active")
+async def get_active_downloads():
+    """List all downloads that are currently starting or in progress, with live progress info"""
+    return [
+        {"key": key, **info}
+        for key, info in download_status.items()
+        if info.get("status") in ("starting", "downloading")
+    ]
 
 @app.get("/api/epg-status")
 async def get_epg_status():

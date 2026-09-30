@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory, abort
 import requests
-from database import init_db, add_download, update_download_status, get_downloads
+from database import init_db, add_download, update_download_status, get_downloads, get_titles_for_pids, delete_download, clear_downloads
 import os
 import sqlite3
 
@@ -94,6 +94,51 @@ def download():
             update_download_status(data['pid'], 'failed')
         return jsonify({'error': str(e)}), 500
 
+@app.route('/download_series', methods=['POST'])
+def download_series():
+    data = request.json
+    print(f"Flask received series download request: {data}")  # Debug log
+    try:
+        sid = data.get('sid')
+        title = data.get('title', 'Unknown Series')
+        pid = f"series:{sid}"
+        print(f"Adding series download to database: SID={sid}, Title={title}")  # Debug log
+        add_download(pid, title)
+
+        fastapi_data = {
+            'sid': sid,
+            'quality': data.get('quality', 'HD1080'),
+            'output_dir': data.get('output_dir', DEFAULT_DOWNLOAD_DIR)
+        }
+        print(f"Sending to FastAPI: {fastapi_data}")  # Debug log
+
+        response = requests.post(f"{BACKEND_URL}/api/download-series", json=fastapi_data, timeout=10)
+        print(f"FastAPI response status: {response.status_code}")  # Debug log
+        print(f"FastAPI response content: {response.text}")  # Debug log
+
+        result = response.json()
+
+        if not response.ok:
+            update_download_status(pid, 'failed')
+            return jsonify({'error': result.get('detail', 'Series download failed')}), response.status_code
+
+        return jsonify({
+            'status': 'started',
+            'sid': sid,
+            'status_key': pid,
+            'message': 'Series download started successfully'
+        })
+    except requests.RequestException as e:
+        print("Series download error:", str(e))
+        if data.get('sid'):
+            update_download_status(f"series:{data['sid']}", 'failed')
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error in Flask download_series route: {str(e)}")
+        if data.get('sid'):
+            update_download_status(f"series:{data['sid']}", 'failed')
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/check_status/<pid>')
 def check_status(pid):
     try:
@@ -126,6 +171,38 @@ def check_status(pid):
 def get_download_history():
     downloads = get_downloads()
     return jsonify([dict(d) for d in downloads])
+
+@app.route('/downloads/<int:download_id>', methods=['DELETE'])
+def remove_download_entry(download_id):
+    delete_download(download_id)
+    return jsonify({'status': 'deleted', 'id': download_id})
+
+@app.route('/downloads/clear', methods=['POST'])
+def clear_download_history():
+    data = request.json or {}
+    status = data.get('status')  # None clears everything, otherwise only that status
+    clear_downloads(status)
+    return jsonify({'status': 'cleared', 'filter': status})
+
+@app.route('/active_downloads')
+def get_active_downloads():
+    """List downloads currently in progress, with title and live progress info"""
+    try:
+        response = requests.get(f"{BACKEND_URL}/api/downloads/active", timeout=10)
+        if not response.ok:
+            return jsonify({'error': 'Failed to fetch active downloads'}), response.status_code
+
+        active = response.json()
+        titles = get_titles_for_pids([item['key'] for item in active])
+
+        for item in active:
+            item['title'] = titles.get(item['key'], item['key'])
+            item['is_series'] = item['key'].startswith('series:')
+
+        return jsonify(active)
+    except requests.RequestException as e:
+        print("Active downloads error:", str(e))
+        return jsonify({'error': str(e)}), 500
 
 # Add download file serving routes
 @app.route('/download/')

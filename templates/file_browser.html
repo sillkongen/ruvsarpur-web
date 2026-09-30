@@ -187,6 +187,43 @@
             </div>
         </div>
 
+        <!-- Active Downloads -->
+        <div id="activeDownloadsSection" class="card mb-4 d-none">
+            <div class="card-header">
+                <h5 class="mb-0">⏳ Active Downloads</h5>
+            </div>
+            <div class="list-group list-group-flush" id="activeDownloadsList"></div>
+        </div>
+
+        <!-- Download History -->
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h5 class="mb-0">📜 Download History</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="btn-group btn-group-sm" role="group" id="historyFilter">
+                        <button type="button" class="btn btn-outline-secondary active" data-filter="all">All</button>
+                        <button type="button" class="btn btn-outline-secondary" data-filter="completed">Completed</button>
+                        <button type="button" class="btn btn-outline-secondary" data-filter="failed">Failed</button>
+                        <button type="button" class="btn btn-outline-secondary" data-filter="started">In Progress</button>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-danger dropdown-toggle" type="button" id="clearHistoryDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            🗑️ Clear
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" id="clearHistoryMenu" aria-labelledby="clearHistoryDropdown">
+                            <li><a class="dropdown-item" href="#" data-clear="completed">Clear Completed</a></li>
+                            <li><a class="dropdown-item" href="#" data-clear="failed">Clear Failed</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" data-clear="all">Clear All</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="list-group list-group-flush" id="historyList">
+                <div class="list-group-item text-muted">Loading history…</div>
+            </div>
+        </div>
+
         <!-- File List -->
         {% if files %}
         <div class="alert alert-info mb-3">
@@ -302,6 +339,188 @@
                 });
             });
         });
+
+        // Active downloads polling
+        const activeDownloadsSection = document.getElementById('activeDownloadsSection');
+        const activeDownloadsList = document.getElementById('activeDownloadsList');
+
+        function renderActiveDownloads(items) {
+            if (!items.length) {
+                activeDownloadsSection.classList.add('d-none');
+                activeDownloadsList.innerHTML = '';
+                return;
+            }
+
+            activeDownloadsSection.classList.remove('d-none');
+            activeDownloadsList.innerHTML = items.map(item => {
+                const icon = item.is_series ? '📺' : '🎬';
+                const label = item.is_series ? `${item.title} (all episodes)` : item.title;
+
+                let percent = null;
+                let caption = 'Starting…';
+
+                if (item.total_episodes && item.current_episode) {
+                    const perEpisode = item.total_episodes > 0 ? 1 / item.total_episodes : 0;
+                    const episodeFraction = ((item.percent || 0) / 100) * perEpisode;
+                    percent = Math.min(100, Math.round(((item.current_episode - 1) * perEpisode + episodeFraction) * 100));
+                    caption = `Episode ${item.current_episode} of ${item.total_episodes}` +
+                        (item.current_title ? `: ${item.current_title}` : '') +
+                        (item.percent != null ? ` — ${item.percent.toFixed(1)}%` : '');
+                } else if (item.percent != null) {
+                    percent = Math.round(item.percent);
+                    caption = `${item.percent.toFixed(1)}%`;
+                } else if (item.message) {
+                    caption = item.message;
+                }
+
+                const barClasses = percent === null
+                    ? 'progress-bar progress-bar-striped progress-bar-animated'
+                    : 'progress-bar';
+                const barStyle = percent === null ? 'width: 100%' : `width: ${percent}%`;
+
+                return `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span>${icon} ${label}</span>
+                            <small class="text-muted">${caption}</small>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="${barClasses}" role="progressbar" style="${barStyle}"></div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        async function pollActiveDownloads() {
+            try {
+                const response = await fetch('/active_downloads');
+                if (response.ok) {
+                    renderActiveDownloads(await response.json());
+                }
+            } catch (error) {
+                console.error('Error fetching active downloads:', error);
+            }
+        }
+
+        pollActiveDownloads();
+        setInterval(pollActiveDownloads, 3000);
+
+        // Download history
+        const historyList = document.getElementById('historyList');
+        const historyFilter = document.getElementById('historyFilter');
+        const clearHistoryMenu = document.getElementById('clearHistoryMenu');
+        let historyItems = [];
+        let historyFilterValue = 'all';
+
+        const STATUS_INFO = {
+            completed: { icon: '✅', label: 'Completed', badge: 'success' },
+            failed:    { icon: '❌', label: 'Failed', badge: 'danger' },
+            started:   { icon: '⏳', label: 'In Progress', badge: 'warning' },
+        };
+
+        function formatTimestamp(value) {
+            if (!value) return '';
+            const date = new Date(value.replace(' ', 'T'));
+            if (isNaN(date)) return value;
+            return date.toLocaleString();
+        }
+
+        function renderHistory() {
+            const filtered = historyFilterValue === 'all'
+                ? historyItems
+                : historyItems.filter(item => item.status === historyFilterValue);
+
+            if (!filtered.length) {
+                historyList.innerHTML = '<div class="list-group-item text-muted">No downloads found.</div>';
+                return;
+            }
+
+            historyList.innerHTML = filtered.map(item => {
+                const info = STATUS_INFO[item.status] || { icon: '❔', label: item.status, badge: 'secondary' };
+                const isSeries = String(item.pid || '').startsWith('series:');
+                const label = isSeries ? `${item.title} (all episodes)` : item.title;
+                const when = item.completed_at
+                    ? `Completed ${formatTimestamp(item.completed_at)}`
+                    : `Started ${formatTimestamp(item.created_at)}`;
+
+                return `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <div>${isSeries ? '📺' : '🎬'} ${label}</div>
+                            <small class="text-muted">${when}</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-${info.badge}">${info.icon} ${info.label}</span>
+                            <button class="btn btn-sm btn-outline-secondary" data-delete-id="${item.id}" title="Remove from history">✕</button>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch('/downloads');
+                if (response.ok) {
+                    historyItems = await response.json();
+                    renderHistory();
+                }
+            } catch (error) {
+                console.error('Error fetching download history:', error);
+            }
+        }
+
+        async function deleteHistoryItem(id) {
+            try {
+                await fetch(`/downloads/${id}`, { method: 'DELETE' });
+                historyItems = historyItems.filter(item => item.id !== id);
+                renderHistory();
+            } catch (error) {
+                console.error('Error deleting history item:', error);
+            }
+        }
+
+        async function clearHistory(status) {
+            const confirmMsg = status
+                ? `Clear all ${status} downloads from history?`
+                : 'Clear the entire download history? This cannot be undone.';
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                await fetch('/downloads/clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(status ? { status } : {})
+                });
+                await loadHistory();
+            } catch (error) {
+                console.error('Error clearing history:', error);
+            }
+        }
+
+        historyFilter.addEventListener('click', (e) => {
+            const button = e.target.closest('button[data-filter]');
+            if (!button) return;
+            historyFilter.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+            historyFilterValue = button.dataset.filter;
+            renderHistory();
+        });
+
+        historyList.addEventListener('click', (e) => {
+            const button = e.target.closest('button[data-delete-id]');
+            if (!button) return;
+            deleteHistoryItem(parseInt(button.dataset.deleteId, 10));
+        });
+
+        clearHistoryMenu.addEventListener('click', (e) => {
+            const link = e.target.closest('a[data-clear]');
+            if (!link) return;
+            e.preventDefault();
+            clearHistory(link.dataset.clear === 'all' ? null : link.dataset.clear);
+        });
+
+        loadHistory();
+        setInterval(loadHistory, 10000);
     </script>
 </body>
-</html> 
+</html>

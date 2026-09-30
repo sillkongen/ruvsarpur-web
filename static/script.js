@@ -179,6 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const seenSeries = new Set();
+
         results.forEach(result => {
             const title = result.title || result.name || 'Untitled';
             const description = result.description || result.desc || '';
@@ -202,6 +204,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 result.duration   ? `<span class="badge-pill"><i class="bi bi-clock"></i> ${result.duration}</span>` : '',
             ].filter(Boolean).join('');
 
+            const seriesId = result.series_id || '';
+            const totalEpisodes = parseInt(result.total_episodes, 10) || 0;
+            const seriesTitle = result.series_title || title;
+            const safeSeriesTitle = seriesTitle.replace(/'/g, "\\'");
+
+            let downloadAllBtn = '';
+            if (seriesId && totalEpisodes > 1 && !seenSeries.has(seriesId)) {
+                seenSeries.add(seriesId);
+                downloadAllBtn = `
+                    <button class="btn-download btn-download-all"
+                            onclick="downloadSeries('${seriesId}', '${safeSeriesTitle}', this)"
+                            data-sid="${seriesId}">
+                        <i class="bi bi-collection-play me-1"></i>Download All (${totalEpisodes})
+                    </button>`;
+            }
+
             const item = document.createElement('div');
             item.className = 'result-card';
             item.innerHTML = `
@@ -218,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             data-pid="${id}">
                         <i class="bi bi-download me-1"></i>Download
                     </button>
+                    ${downloadAllBtn}
                 </div>`;
             resultsDiv.appendChild(item);
         });
@@ -267,6 +286,54 @@ document.addEventListener('DOMContentLoaded', () => {
             buttonElement.disabled = false;
             window.activeDownloads.delete(pid);
             showError(`Download failed: ${error.message}`);
+        }
+    };
+
+    // Make downloadSeries globally accessible
+    window.downloadSeries = async function(sid, title, buttonElement) {
+        const statusKey = `series:${sid}`;
+        if (window.activeDownloads.has(statusKey)) {
+            console.log(`Series download already in progress for ${sid}`);
+            return;
+        }
+
+        try {
+            window.activeDownloads.add(statusKey);
+
+            buttonElement.innerHTML = '<span class="dl-status dl-started"><i class="bi bi-hourglass-split"></i> Starting…</span>';
+            buttonElement.disabled = true;
+
+            const response = await fetch('/download_series', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sid: sid,
+                    title: title,
+                    quality: 'HD1080',
+                    output_dir: 'downloads'
+                })
+            });
+
+            const result = await response.json();
+            console.log('Series download response:', result);
+
+            if (response.ok) {
+                console.log(`Series download started for ${sid}`);
+                buttonElement.innerHTML = '<span class="dl-status dl-progress"><i class="bi bi-arrow-down-circle"></i> Downloading series…</span>';
+
+                // Start polling for status using the generic status checker
+                checkDownloadStatus(statusKey, buttonElement);
+            } else {
+                throw new Error(result.error || 'Series download failed');
+            }
+        } catch (error) {
+            console.error('Series download error:', error);
+            buttonElement.innerHTML = '<span class="dl-status dl-failed"><i class="bi bi-x-circle-fill"></i> Failed</span>';
+            buttonElement.disabled = false;
+            window.activeDownloads.delete(statusKey);
+            showError(`Series download failed: ${error.message}`);
         }
     };
 
