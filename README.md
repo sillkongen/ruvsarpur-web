@@ -35,12 +35,12 @@ A modern web interface for downloading shows from RÚV Sarpurinn with instant se
 
 2. **Start the application:**
    ```bash
-   docker-compose up --build -d
+   docker compose up --build -d
    ```
 
 3. **Stop the application:**
    ```bash
-   docker-compose down --remove-orphans
+   docker compose down --remove-orphans
    ```
 
 4. **Access the application:**

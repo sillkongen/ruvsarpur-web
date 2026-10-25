@@ -48,7 +48,7 @@ Thank you for your interest in contributing to this project! We welcome contribu
 ### Docker Development
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 ## 📝 Code Style
@@ -70,12 +70,12 @@ Before submitting a PR:
 
 2. **Test with Docker:**
    ```bash
-   docker-compose up --build
+   docker compose up --build
    ```
 
 3. **Check logs for errors:**
    ```bash
-   docker-compose logs
+   docker compose logs
    ```
 
 ## 📋 Pull Request Process
