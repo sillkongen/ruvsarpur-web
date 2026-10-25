@@ -20,7 +20,7 @@ Thank you for your interest in contributing to this project! We welcome contribu
 ### Prerequisites
 
 - Python 3.9+
-- Docker and Docker Compose (for testing)
+- Docker with Compose v2, i.e. `docker compose` (for testing)
 - Access to ruvsarpur source code
 
 ### Local Development
