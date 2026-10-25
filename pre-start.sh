@@ -9,7 +9,7 @@ CURRENT_UID=$(id -u)
 CURRENT_GID=$(id -g)
 echo "Current user UID: $CURRENT_UID, GID: $CURRENT_GID"
 
-# Export these as environment variables for docker-compose
+# Export these as environment variables for docker compose
 export HOST_UID=$CURRENT_UID
 export HOST_GID=$CURRENT_GID
 echo "Setting HOST_UID=$HOST_UID and HOST_GID=$HOST_GID"
@@ -46,4 +46,4 @@ echo "Environment variables set:"
 echo "  HOST_UID=$HOST_UID"
 echo "  HOST_GID=$HOST_GID"
 echo ""
-echo "Now you can run: docker-compose up --build" 
+echo "Now you can run: docker compose up --build" 

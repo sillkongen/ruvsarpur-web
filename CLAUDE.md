@@ -11,9 +11,9 @@ RÚV Sarpurinn Web Downloader — a web UI wrapping the [ruvsarpur](https://gith
 **Docker (recommended):**
 ```bash
 ./pre-start.sh          # Sets HOST_UID/HOST_GID env vars, creates host dirs
-docker-compose up --build -d
+docker compose up --build -d
 # Frontend: http://localhost:5000  |  Backend API: http://localhost:8001
-docker-compose down --remove-orphans
+docker compose down --remove-orphans
 ```
 
 **Local development:**

@@ -56,8 +56,8 @@ refresh_epg() {
         
         echo "✅ EPG data refreshed successfully!"
     else
-        echo "❌ Failed to refresh EPG data"
-        exit 1
+        # Don't abort startup: the backend retries the EPG refresh in the background
+        echo "❌ Failed to refresh EPG data, starting anyway (backend will retry)"
     fi
 }
 
@@ -98,5 +98,9 @@ cd /app
 python3 app.py &
 FRONTEND_PID=$!
 
-# Wait for either process to exit
-wait $BACKEND_PID $FRONTEND_PID 
+# Wait for either process to exit, then stop the other so Docker restarts the container
+wait -n $BACKEND_PID $FRONTEND_PID
+EXIT_CODE=$?
+echo "A service exited (code $EXIT_CODE), shutting down..."
+kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
+exit $EXIT_CODE 

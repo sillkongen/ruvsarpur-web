@@ -22,8 +22,12 @@ A modern web interface for downloading shows from RÚV Sarpurinn with instant se
 
 ### Prerequisites
 
-1. **EPG data**: Run ruvsarpur at least once to generate `~/.ruvsarpur/tvschedule.json`  
-   (Or use any existing ruvsarpur installation)
+1. **Docker with Compose v2**: commands below use `docker compose` (with a space).
+   The legacy standalone `docker-compose` (v1) is end-of-life and not required.
+   Check with `docker compose version`.
+2. **EPG data**: Nothing to do for Docker. The container downloads the schedule
+   (`tvschedule.json`) on first start. For local development, run ruvsarpur once
+   to generate `~/.ruvsarpur/tvschedule.json`.
 
 ### Docker Commands
 
@@ -35,12 +39,14 @@ A modern web interface for downloading shows from RÚV Sarpurinn with instant se
 
 2. **Start the application:**
    ```bash
-   docker-compose up --build -d
+   docker compose up --build -d
    ```
+   The first start takes a minute or two while the EPG data downloads.
+   Follow progress with `docker compose logs -f`.
 
 3. **Stop the application:**
    ```bash
-   docker-compose down --remove-orphans
+   docker compose down --remove-orphans
    ```
 
 4. **Access the application:**
